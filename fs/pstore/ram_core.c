@@ -280,7 +280,7 @@ static void notrace persistent_ram_update(struct persistent_ram_zone *prz,
 #ifdef CONFIG_PSTORE
 	memcpy_pstore(buffer->data + start, s, count);
 #else
-	memcpy(buffer->data + start, s, count);
+	memcpy_toio(buffer->data + start, s, count);
 #endif
 	persistent_ram_update_ecc(prz, start, count);
 }
