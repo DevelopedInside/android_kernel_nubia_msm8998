@@ -131,4 +131,12 @@ config NUBIA_LCD_KEEP_POWER_ON
 	default n
 	---help---
 	JDI LCD and TP seq modifications.
+
+config FB_MSM_MDSS_KCAL_CTRL
+	depends on FB_MSM_MDSS
+	bool "MDSS color control"
+	---help---
+	  Enable sysfs for post-processing control of mdss-mdp5 display
+	  controllers in MDSS.
+
 endif
