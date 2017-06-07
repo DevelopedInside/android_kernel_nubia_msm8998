@@ -1119,6 +1119,9 @@ static int qpnp_lpg_configure_lut_state(struct qpnp_pwm_chip *chip,
 	addr = SPMI_LPG_REG_ADDR(lpg_config->base_addr,
 				QPNP_ENABLE_CONTROL);
 
+	// Add 1mS delay to fix qcom known HW issue
+	mdelay(1);
+
 	if (chip->in_test_mode) {
 		test_enable = (state == QPNP_LUT_ENABLE) ? 1 : 0;
 		rc = qpnp_dtest_config(chip, test_enable);
