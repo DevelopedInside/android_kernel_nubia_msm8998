@@ -33,7 +33,6 @@ static struct input_dev * sweep2sleep_pwrdev;
 static DEFINE_MUTEX(pwrkeyworklock);
 static struct workqueue_struct *s2s_input_wq;
 static struct work_struct s2s_input_work;
-extern void set_vibrate(int value); 
 static int vib_strength = VIB_STRENGTH;
 
 /* PowerKey work func */
@@ -54,7 +53,6 @@ static DECLARE_WORK(sweep2sleep_presspwr_work, sweep2sleep_presspwr);
 
 /* PowerKey trigger */
 static void sweep2sleep_pwrtrigger(void) {
-	set_vibrate(vib_strength);
 	schedule_work(&sweep2sleep_presspwr_work);
         return;
 }
