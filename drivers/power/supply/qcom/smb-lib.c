@@ -3842,14 +3842,14 @@ static void smblib_handle_typec_debounce_done(struct smb_charger *chg,
 	int rc;
 	union power_supply_propval pval = {0, };
 
-	rc = smblib_get_prop_typec_mode(chg, &pval);
-	if (rc < 0)
-		smblib_err(chg, "Couldn't get prop typec mode rc=%d\n", rc);
-
-	if (rising && pval.intval != POWER_SUPPLY_TYPEC_NONE)
+	if (rising)
 		smblib_handle_typec_insertion(chg, sink_attached, legacy_cable);
 	else
 		smblib_handle_typec_removal(chg);
+
+	rc = smblib_get_prop_typec_mode(chg, &pval);
+	if (rc < 0)
+		smblib_err(chg, "Couldn't get prop typec mode rc=%d\n", rc);
 
 	/*
 	 * HW BUG - after cable is removed, medium or high rd reading

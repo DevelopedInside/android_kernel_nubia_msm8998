@@ -261,7 +261,7 @@ struct smb2 {
 	bool			bad_part;
 };
 
-static int __debug_mask = 0x01;
+static int __debug_mask;
 module_param_named(
 	debug_mask, __debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -1434,12 +1434,6 @@ static int smb2_init_hw(struct smb2 *chip)
 	struct smb_charger *chg = &chip->chg;
 	int rc;
 	u8 stat;
-
-	rc = smblib_write(chg, HVDCP_PULSE_COUNT_MAX, HVDCP_DEFAULT_VALUE);
-	if (rc < 0) {
-		pr_err("Couldn't set default value to HVDCP_PULSE_COUNT_MAX, rc=%d\n", rc);
-		return rc;
-	}
 
 	if (chip->dt.no_battery)
 		chg->fake_capacity = 50;
