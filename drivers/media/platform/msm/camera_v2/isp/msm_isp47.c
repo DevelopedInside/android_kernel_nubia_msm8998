@@ -1859,7 +1859,7 @@ void msm_vfe47_cfg_axi_ub_equal_default(
 					axi_data->free_wm[i])
 					break;
 
-			rdi_ub_offset = ((SRC_TO_INTF(
+			rdi_ub_offset = (SRC_TO_INTF(
 					HANDLE_TO_IDX(axi_data->free_wm[i])) -
 					VFE_RAW_0 * 2) + plane) *
 					axi_data->hw_info->min_wm_ub * 2;//ZTEMT: fengxun added qcom patch
