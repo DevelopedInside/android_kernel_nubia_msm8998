@@ -59,6 +59,9 @@
 #include <linux/delay.h>
 #include <linux/cpuset.h>
 #include <linux/atomic.h>
+#ifdef CONFIG_NUBIA_CGF_NOTIFY_EVENT
+#include <linux/notifier.h>
+#endif
 
 /*
  * pidlists linger the following amount before being destroyed.  The goal
@@ -2876,6 +2879,128 @@ static ssize_t cgroup_tasks_write(struct kernfs_open_file *of,
 {
 	return __cgroup_procs_write(of, buf, nbytes, off, false);
 }
+
+#ifdef CONFIG_NUBIA_CGF_NOTIFY_EVENT
+static int attach_task_by_pid(struct cgroup *cgrp, u64 pid, bool threadgroup)
+{
+	struct task_struct *tsk;
+	const struct cred *cred = current_cred();
+	const struct cred *tcred;
+	struct cgroup_subsys *ss;
+	int ssid=0;
+	int ret=0;
+
+	if (pid < 0)
+		return -EINVAL;
+
+	if (!cgroup_tryget(cgrp))
+		return -ENODEV;
+
+	mutex_lock(&cgroup_mutex);
+	if (cgroup_is_dead(cgrp)) {
+		mutex_unlock(&cgroup_mutex);
+		cgroup_put(cgrp);
+		return -ENODEV;
+	}
+
+	percpu_down_write(&cgroup_threadgroup_rwsem);
+	rcu_read_lock();
+	if (pid) {
+		tsk = find_task_by_vpid(pid);
+		if (!tsk) {
+			ret = -ESRCH;
+			goto out_unlock_rcu;
+		}
+	} else {
+		tsk = current;
+	}
+
+	if (threadgroup)
+		tsk = tsk->group_leader;
+
+	/*
+	 * Workqueue threads may acquire PF_NO_SETAFFINITY and become
+	 * trapped in a cpuset, or RT worker may be born in a cgroup
+	 * with no rt_runtime allocated.  Just say no.
+	 */
+	if (tsk == kthreadd_task || (tsk->flags & PF_NO_SETAFFINITY)) {
+		ret = -EINVAL;
+		goto out_unlock_rcu;
+	}
+
+	get_task_struct(tsk);
+	rcu_read_unlock();
+
+	/*
+	 * even if we're attaching all tasks in the thread group, we only
+	 * need to check permissions on one of them.
+	 */
+	tcred = get_task_cred(tsk);
+	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
+	    !uid_eq(cred->euid, tcred->uid) &&
+	    !uid_eq(cred->euid, tcred->suid)) {
+		/*
+		 * if the default permission check fails, give each
+		 * cgroup a chance to extend the permission check
+		 */
+		struct cgroup_taskset tset = {
+			.src_csets = LIST_HEAD_INIT(tset.src_csets),
+			.dst_csets = LIST_HEAD_INIT(tset.dst_csets),
+			.csets = &tset.src_csets,
+		};
+		struct css_set *cset;
+		cset = task_css_set(tsk);
+		list_add(&cset->mg_node, &tset.src_csets);
+		ret = cgroup_allow_attach(cgrp, &tset);
+		list_del(&tset.src_csets);
+		if (ret) {
+			ret = -EACCES;
+		}
+	}
+	if (!ret && cgroup_on_dfl(cgrp)) {
+		struct cgroup *cgrp_tmp;
+
+		spin_lock_irq(&css_set_lock);
+		cgrp_tmp = task_cgroup_from_root(tsk, &cgrp_dfl_root);
+		spin_unlock_irq(&css_set_lock);
+		while (!cgroup_is_descendant(cgrp, cgrp_tmp))
+			cgrp_tmp = cgroup_parent(cgrp_tmp);
+	}
+
+	put_cred(tcred);
+	if (!ret)
+		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
+	put_task_struct(tsk);
+	goto out_unlock_threadgroup;
+
+out_unlock_rcu:
+	rcu_read_unlock();
+out_unlock_threadgroup:
+	percpu_up_write(&cgroup_threadgroup_rwsem);
+	for_each_subsys(ss, ssid)
+		if (ss->post_attach)
+			ss->post_attach();
+	mutex_unlock(&cgroup_mutex);
+	return ret;
+}
+int cgf_attach_task_group(struct cgf_event *event)
+{
+	struct freezer *freezer = container_of(event, struct freezer, event);
+	struct task_struct *p;
+	int ret = 0;
+
+	if(!freezer->event.data) {
+		ret = -EINVAL;
+		goto out_invalid_data;
+	}
+	p = freezer->event.data;
+	ret = attach_task_by_pid(freezer->css.cgroup, p->pid, true);
+out_invalid_data:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cgf_attach_task_group);
+#endif
+
 
 static ssize_t cgroup_procs_write(struct kernfs_open_file *of,
 				  char *buf, size_t nbytes, loff_t off)

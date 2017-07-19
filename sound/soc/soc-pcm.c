@@ -1865,6 +1865,16 @@ int dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 		dev_dbg(be->dev, "ASoC: hw_free BE %s\n",
 			dpcm->fe->dai_link->name);
 
+		//added by nubia, for PR00400311, begin
+		if (dpcm->be->dai_link->name != NULL) {
+                   dev_dbg(dpcm->be->dev, "ASoc: dai_link->name %s\n", dpcm->be->dai_link->name);
+	            if (!strcmp(dpcm->be->dai_link->name,"PRI_MI2S_TX")) {
+				pr_err("it would digital_mute SmartPa, so do not free hw in case of PRI_MI2S_TX\n");
+				continue;
+			}
+		}
+		//added by nubia, for PR00400311, end
+
 		soc_pcm_hw_free(be_substream);
 
 		be->dpcm[stream].state = SND_SOC_DPCM_STATE_HW_FREE;

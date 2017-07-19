@@ -259,11 +259,17 @@ static void pack_rsp_and_send(unsigned char *buf, int len,
 	}
 
 	if (info && info->peripheral_mask) {
-		for (i = 0; i <= NUM_PERIPHERALS; i++) {
-			if (info->peripheral_mask & (1 << i))
+		if (info->peripheral_mask == DIAG_CON_ALL ||
+		(info->peripheral_mask & (1 << APPS_DATA)) ||
+		(info->peripheral_mask & (1 << PERIPHERAL_MODEM))) {
+			rsp_ctxt = SET_BUF_CTXT(APPS_DATA, TYPE_CMD, 1);
+		} else {
+			for (i = 0; i <= NUM_PERIPHERALS; i++) {
+				if (info->peripheral_mask & (1 << i))
 				break;
+			}
+			rsp_ctxt = SET_BUF_CTXT(i, TYPE_CMD, 1);
 		}
-		rsp_ctxt = SET_BUF_CTXT(i, TYPE_CMD, 1);
 	} else
 		rsp_ctxt = driver->rsp_buf_ctxt;
 
@@ -337,11 +343,17 @@ static void encode_rsp_and_send(unsigned char *buf, int len,
 	}
 
 	if (info && info->peripheral_mask) {
-		for (i = 0; i <= NUM_PERIPHERALS; i++) {
+		if (info->peripheral_mask == DIAG_CON_ALL ||
+		(info->peripheral_mask & (1 << APPS_DATA)) ||
+		(info->peripheral_mask & (1 << PERIPHERAL_MODEM))) {
+			rsp_ctxt = SET_BUF_CTXT(APPS_DATA, TYPE_CMD, 1);
+		} else {
+			for (i = 0; i <= NUM_PERIPHERALS; i++) {
 			if (info->peripheral_mask & (1 << i))
-				break;
+			break;
 		}
 		rsp_ctxt = SET_BUF_CTXT(i, TYPE_CMD, 1);
+		}
 	} else
 		rsp_ctxt = driver->rsp_buf_ctxt;
 
@@ -1016,6 +1028,20 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 		/* Not required, represents that command isnt sent to modem */
 		return 0;
 	}
+#ifdef CONFIG_NUBIA_DIAG_REBOOT_CMD
+    	/* Check for reboot command */
+	else if (chk_apps_master() && (*buf == 0x29) && (*(buf+1) == 0x02) && (*(buf+2) == 0x00)) {
+		/* send response back */
+		//driver->apps_rsp_buf[0] = *buf;
+		memcpy(driver->apps_rsp_buf,buf,3);
+		diag_send_rsp(driver->apps_rsp_buf, 1, info);
+		msleep(5000);
+		printk(KERN_CRIT "diag: reboot set, Rebooting SoC..\n");
+		kernel_restart(NULL);
+		/* Not required, represents that command isnt sent to modem */
+		return 0;
+	}
+#endif
 	/* Check for polling for Apps only DIAG */
 	else if ((*buf == 0x4b) && (*(buf+1) == 0x32) &&
 		(*(buf+2) == 0x03)) {

@@ -19,6 +19,24 @@ config USB_EHCI_BIG_ENDIAN_MMIO
 config USB_EHCI_BIG_ENDIAN_DESC
 	bool
 
+config NUBIA_USB_MAXIMUM_SPEED_HIGH
+        bool "nubia usb maximum speed is high"
+        default n
+        help
+          nubia usb maximum speed is high.
+
+config NUBIA_EYETEST_CONFIG
+        bool "nubia usb dts set tune1 enable"
+        default n
+        help
+         nubia usb dts set tune1 enable.
+
+config NUBIA_USB_AUTOPM_RESUME
+        bool "nubia usb autopm with resume"
+        default n
+        help
+          nubia usb autopm with resume.
+
 menuconfig USB_SUPPORT
 	bool "USB support"
 	depends on HAS_IOMEM

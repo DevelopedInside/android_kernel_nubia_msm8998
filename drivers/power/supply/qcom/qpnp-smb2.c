@@ -261,7 +261,7 @@ struct smb2 {
 	bool			bad_part;
 };
 
-static int __debug_mask;
+static int __debug_mask = 0x01;
 module_param_named(
 	debug_mask, __debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -388,8 +388,34 @@ static int smb2_parse_dt(struct smb2 *chip)
 
 	chg->suspend_input_on_debug_batt = of_property_read_bool(node,
 					"qcom,suspend-input-on-debug-batt");
+
 	return 0;
 }
+
+#if defined(CONFIG_TYPEC_AUDIO_ADAPTER_SWITCH)
+#include <linux/of_gpio.h>
+static int smb2_pre_parse_dt(struct smb2 *chip)
+{
+	struct smb_charger *chg = &chip->chg;
+	struct device_node *node = chg->dev->of_node;
+
+	if (!node) {
+		pr_err("device tree node missing\n");
+		return -EINVAL;
+	}
+
+	chg->usb_audio_select_supported = of_property_read_bool(node,
+					"qcom,usb-audio-select-support");
+
+	chg->switch_en = of_get_named_gpio(node, "qcom,switch-en-gpio", 0);
+
+	chg->switch_select = of_get_named_gpio(node, "qcom,switch-select-gpio", 0);
+
+	chg->mbhc_int = of_get_named_gpio(node, "qcom,mbhc-int-gpio", 0);
+
+	return 0;
+}
+#endif
 
 /************************
  * USB PSY REGISTRATION *
@@ -1059,7 +1085,6 @@ static int smb2_init_batt_psy(struct smb2 *chip)
 	struct power_supply_config batt_cfg = {};
 	struct smb_charger *chg = &chip->chg;
 	int rc = 0;
-
 	batt_cfg.drv_data = chg;
 	batt_cfg.of_node = chg->dev->of_node;
 	chg->batt_psy = devm_power_supply_register(chg->dev,
@@ -1409,6 +1434,12 @@ static int smb2_init_hw(struct smb2 *chip)
 	struct smb_charger *chg = &chip->chg;
 	int rc;
 	u8 stat;
+
+	rc = smblib_write(chg, HVDCP_PULSE_COUNT_MAX, HVDCP_DEFAULT_VALUE);
+	if (rc < 0) {
+		pr_err("Couldn't set default value to HVDCP_PULSE_COUNT_MAX, rc=%d\n", rc);
+		return rc;
+	}
 
 	if (chip->dt.no_battery)
 		chg->fake_capacity = 50;
@@ -2104,6 +2135,13 @@ static int smb2_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+#if defined(CONFIG_TYPEC_AUDIO_ADAPTER_SWITCH)
+	rc = smb2_pre_parse_dt(chip);
+	if (rc < 0) {
+		pr_err("Couldn't pre-parse dt. rc=%d\n", rc);
+		return rc;
+	}
+#endif
 	rc = smblib_init(chg);
 	if (rc < 0) {
 		pr_err("Smblib_init failed rc=%d\n", rc);

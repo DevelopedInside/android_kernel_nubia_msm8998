@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
+#define DEBUG
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
@@ -176,6 +176,8 @@ struct msm_pinctrl_info {
 
 struct msm_asoc_mach_data {
 	u32 mclk_freq;
+	int swap_en1_gpio;
+	int swap_en0_gpio;
 	int us_euro_gpio; /* used by gpio driver API */
 	struct device_node *us_euro_gpio_p; /* used by pinctrl API */
 	struct device_node *hph_en1_gpio_p; /* used by pinctrl API */
@@ -521,20 +523,32 @@ static int msm_wsa881x_init(struct snd_soc_component *component);
 static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
+#ifdef CONFIG_ZTEMT_AUDIO
+	.detect_extn_cable = false,
+#else
 	.detect_extn_cable = true,
+#endif
 	.mono_stero_detection = false,
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = true,
+#ifdef CONFIG_ZTEMT_AUDIO
+	.key_code[0] = KEY_MEDIA,
+	.key_code[1] = KEY_VOLUMEUP,
+	.key_code[2] = KEY_VOLUMEDOWN,
+	.key_code[3] = 0,
+#else
 	.key_code[0] = KEY_MEDIA,
 	.key_code[1] = KEY_VOICECOMMAND,
 	.key_code[2] = KEY_VOLUMEUP,
 	.key_code[3] = KEY_VOLUMEDOWN,
+#endif
 	.key_code[4] = 0,
 	.key_code[5] = 0,
 	.key_code[6] = 0,
 	.key_code[7] = 0,
 	.linein_th = 5000,
 	.moisture_en = true,
+	.mbhc_micbias = MIC_BIAS_2,
 	.anc_micbias = MIC_BIAS_2,
 	.enable_anc_mic_detect = false,
 };
@@ -2871,6 +2885,7 @@ static const struct snd_soc_dapm_widget msm_dapm_widgets[] = {
 	SND_SOC_DAPM_SPK("Lineout_4 amp", NULL),
 	SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
+	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
@@ -3291,6 +3306,7 @@ done:
 	return rc;
 }
 
+#if 0
 static bool msm_swap_gnd_mic(struct snd_soc_codec *codec)
 {
 	struct snd_soc_card *card = codec->component.card;
@@ -3313,6 +3329,113 @@ static bool msm_swap_gnd_mic(struct snd_soc_codec *codec)
 	pr_debug("%s: swap select switch %d to %d\n", __func__, value, !value);
 	return true;
 }
+#endif
+
+static int msm_swap_init(struct snd_soc_card *card)
+{
+	struct msm_asoc_mach_data *pdata =
+				snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	if (pdata->swap_en0_gpio >= 0) {
+		dev_dbg(card->dev, "%s: swap_en0_gpio gpio request %d", __func__,
+			pdata->swap_en0_gpio);
+		ret = gpio_request(pdata->swap_en0_gpio, "TASHA_CODEC_SWAP_EN0");
+		if (ret) {
+			dev_err(card->dev,
+				"%s: Failed to request codec TASHA_CODEC_SWAP_EN0 %d error %d\n",
+				__func__, pdata->swap_en0_gpio, ret);
+			goto init_err;
+		}
+	}
+
+	if (pdata->swap_en1_gpio >= 0) {
+		dev_dbg(card->dev, "%s: swap_en1_gpio gpio request %d", __func__,
+			pdata->swap_en1_gpio);
+		ret = gpio_request(pdata->swap_en1_gpio, "TASHA_CODEC_SWAP_EN1");
+		if (ret) {
+			dev_err(card->dev,
+				"%s: Failed to request codec TASHA_CODEC_SWAP_EN1 %d error %d\n",
+				__func__, pdata->swap_en1_gpio, ret);
+			goto init_err;
+		}
+	}
+
+	ret = gpio_direction_output(pdata->swap_en0_gpio, 0);
+	if (ret) {
+		dev_err(card->dev,"%s: set swap_en0_gpio faided\n",__func__);
+		goto init_err;
+	}
+
+	ret = gpio_direction_output(pdata->swap_en1_gpio, 1);
+	if (ret) {
+		dev_err(card->dev,"%s: set swap_en1_gpio faided\n",__func__);
+		goto init_err;
+	}
+
+	return 0;
+init_err:
+	if (gpio_is_valid(pdata->swap_en0_gpio))
+		gpio_free(pdata->swap_en0_gpio);
+
+	if (gpio_is_valid(pdata->swap_en1_gpio))
+		gpio_free(pdata->swap_en1_gpio);
+
+	return ret;
+}
+
+static bool msm_swap_set(struct snd_soc_codec *codec, int value1, int value2)
+{
+	struct snd_soc_card *card = codec->component.card;
+	struct msm_asoc_mach_data *pdata =
+				snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	dev_dbg(card->dev, "%s: set value1 is %d and value2 is %d", __func__, value1, value2);
+
+	if (gpio_is_valid(pdata->swap_en0_gpio)) {
+		ret = gpio_direction_output(pdata->swap_en0_gpio, value1);
+		if (ret) {
+			dev_dbg(card->dev, "%s: set swap_en0_gpio failed", __func__);
+		}
+		dev_dbg(card->dev, "%s: current swap_en0_gpio is %d\n", __func__, gpio_get_value(pdata->swap_en0_gpio));
+	}
+
+	if (gpio_is_valid(pdata->swap_en1_gpio)) {
+		ret = gpio_direction_output(pdata->swap_en1_gpio, value2);
+		if (ret) {
+			dev_dbg(card->dev, "%s: set swap_en1_gpio failed", __func__);
+		}
+		dev_dbg(card->dev, "%s: current swap_en1_gpio is %d\n", __func__, gpio_get_value(pdata->swap_en1_gpio));
+	}
+
+	return true;
+}
+
+#if 0
+static bool msm_swap_gnd_mic(struct snd_soc_codec *codec, int value1, int value2 )
+{
+	struct snd_soc_card *card = codec->component.card;
+	struct msm_asoc_mach_data *pdata =
+				snd_soc_card_get_drvdata(card);
+	int value;
+
+	if (pdata->us_euro_gpio_p) {
+		value = msm_cdc_pinctrl_get_state(pdata->us_euro_gpio_p);
+		if (value)
+			msm_cdc_pinctrl_select_sleep_state(
+							pdata->us_euro_gpio_p);
+		else
+			msm_cdc_pinctrl_select_active_state(
+							pdata->us_euro_gpio_p);
+	} else if (pdata->us_euro_gpio >= 0) {
+		value = gpio_get_value_cansleep(pdata->us_euro_gpio);
+		gpio_set_value_cansleep(pdata->us_euro_gpio, !value);
+	}
+	pr_debug("%s: swap select switch %d to %d\n", __func__, value, !value);
+	return true;
+}
+#endif
 
 static int msm_afe_set_config(struct snd_soc_codec *codec)
 {
@@ -3532,6 +3655,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 					ARRAY_SIZE(wcd_audio_paths));
 
 	snd_soc_dapm_ignore_suspend(dapm, "Handset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Secondary Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "ANCRight Headset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "ANCLeft Headset Mic");
@@ -3713,6 +3837,16 @@ static void *def_tasha_mbhc_cal(void)
 	btn_high = ((void *)&btn_cfg->_v_btn_low) +
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
+#ifdef CONFIG_ZTEMT_AUDIO
+	btn_high[0] = 110;
+	btn_high[1] = 240;
+	btn_high[2] = 437;
+	btn_high[3] = 437;
+	btn_high[4] = 437;
+	btn_high[5] = 437;
+	btn_high[6] = 437;
+	btn_high[7] = 437;
+#else
 	btn_high[0] = 75;
 	btn_high[1] = 150;
 	btn_high[2] = 237;
@@ -3721,7 +3855,7 @@ static void *def_tasha_mbhc_cal(void)
 	btn_high[5] = 500;
 	btn_high[6] = 500;
 	btn_high[7] = 500;
-
+#endif
 	return tasha_wcd_cal;
 }
 
@@ -4048,7 +4182,9 @@ static void msm_aux_pcm_snd_shutdown(struct snd_pcm_substream *substream)
 			dev_err(rtd->card->dev,
 				"%s lpaif_tert_muxsel_virt_addr is NULL\n",
 				__func__);
-			auxpcm_intf_conf[index].ref_cnt++;
+           //delete by nubia lxl start,resolve adsp subsys restart execption
+		   //auxpcm_intf_conf[index].ref_cnt++;
+           //delete by nubia lxl end,resolve adsp subsys restart execption
 		}
 	}
 	mutex_unlock(&auxpcm_intf_conf[index].lock);
@@ -4535,7 +4671,9 @@ static void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 		if (ret < 0) {
 			pr_err("%s:clock disable failed for MI2S (%d); ret=%d\n",
 				__func__, index, ret);
-			mi2s_intf_conf[index].ref_cnt++;
+          // delete by nubia start,resolve adsp subsys restart execption
+          // mi2s_intf_conf[index].ref_cnt++;
+          // delete by nubia lxl end,resolve adsp subsys restart execption
 		}
 	}
 	mutex_unlock(&mi2s_intf_conf[index].lock);
@@ -5302,6 +5440,24 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
 	},
+#ifdef CONFIG_SND_SOC_TAS2555_GENERIC
+	{
+		.name = "PRI_MI2S Hostless",
+		.stream_name = "PRI_MI2S Hostless",
+		.cpu_dai_name = "PRI_MI2S_RX_HOSTLESS",
+		.platform_name = "msm-pcm-hostless",
+		.dynamic = 1,
+		.dpcm_playback = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			    SND_SOC_DPCM_TRIGGER_POST},
+		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
+		 /* this dailink has playback support */
+		.ignore_pmdown_time = 1,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_tasha_fe_dai_links[] = {
@@ -6139,6 +6295,37 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 };
 
 static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
+#ifdef CONFIG_SND_SOC_TAS2555_GENERIC
+	{
+		.name = LPASS_BE_PRI_MI2S_RX,
+		.stream_name = "Primary MI2S Playback",
+		.cpu_dai_name = "msm-dai-q6-mi2s.0",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "tas2555.6-004c",
+		.codec_dai_name = "tas2555 ASI1",
+		.no_pcm = 1,
+		.dpcm_playback = 1,
+		.be_id = MSM_BACKEND_DAI_PRI_MI2S_RX,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &msm_mi2s_be_ops,
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = LPASS_BE_PRI_MI2S_TX,
+		.stream_name = "Primary MI2S Capture",
+		.cpu_dai_name = "msm-dai-q6-mi2s.0",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "tas2555.6-004c",
+		.codec_dai_name = "tas2555 ASI1",
+		.no_pcm = 1,
+		.dpcm_capture = 1,
+		.be_id = MSM_BACKEND_DAI_PRI_MI2S_TX,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &msm_mi2s_be_ops,
+		.ignore_suspend = 1,
+	},
+#else
 	{
 		.name = LPASS_BE_PRI_MI2S_RX,
 		.stream_name = "Primary MI2S Playback",
@@ -6168,6 +6355,7 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.ops = &msm_mi2s_be_ops,
 		.ignore_suspend = 1,
 	},
+#endif
 	{
 		.name = LPASS_BE_SEC_MI2S_RX,
 		.stream_name = "Secondary MI2S Playback",
@@ -6576,6 +6764,7 @@ err:
 	return ret;
 }
 
+#if 0
 static int msm_prepare_us_euro(struct snd_soc_card *card)
 {
 	struct msm_asoc_mach_data *pdata =
@@ -6595,6 +6784,7 @@ static int msm_prepare_us_euro(struct snd_soc_card *card)
 
 	return ret;
 }
+#endif
 
 static int msm_audrx_stub_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -7256,6 +7446,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	ret = msm_populate_dai_link_component_of_node(card);
 	if (ret) {
+		dev_err(&pdev->dev, "msm_populate_dai_link_component_of_node, err:%d\n", ret);
 		ret = -EPROBE_DEFER;
 		goto err;
 	}
@@ -7263,10 +7454,23 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	if (ret)
 		goto err;
 
+	pdata->swap_en0_gpio = of_get_named_gpio(pdev->dev.of_node,
+				"qcom,swap-en0-gpios", 0);
+
+	pdata->swap_en1_gpio = of_get_named_gpio(pdev->dev.of_node,
+				"qcom,swap-en1-gpios", 0);
+
+	ret = msm_swap_init(card);
+	if (ret)
+		dev_dbg(&pdev->dev, "msm_swap_init failed (%d)\n",ret);
+	else
+		wcd_mbhc_cfg.msm_swap_set = msm_swap_set;
+
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		if (codec_reg_done)
 			ret = -EINVAL;
+		dev_err(&pdev->dev, "EPROBE_DEFER\n");
 		goto err;
 	} else if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
@@ -7325,6 +7529,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	 * entry is not found in DT file as some targets do not support
 	 * US-Euro detection
 	 */
+	#if 0
 	pdata->us_euro_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"qcom,us-euro-gpios", 0);
 	if (!gpio_is_valid(pdata->us_euro_gpio))
@@ -7343,6 +7548,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	if (ret)
 		dev_dbg(&pdev->dev, "msm_prepare_us_euro failed (%d)\n",
 			ret);
+       #endif
 
 	/* Parse pinctrl info from devicetree */
 	ret = msm_get_pinctrl(pdev);
@@ -7372,6 +7578,18 @@ err:
 		gpio_free(pdata->us_euro_gpio);
 		pdata->us_euro_gpio = 0;
 	}
+	if (pdata->swap_en1_gpio> 0) {
+		dev_dbg(&pdev->dev, "%s free swap_en1_gpio %d\n",
+			__func__, pdata->swap_en1_gpio);
+		gpio_free(pdata->swap_en1_gpio);
+		pdata->swap_en1_gpio = 0;
+	}
+	if (pdata->swap_en0_gpio > 0) {
+		dev_dbg(&pdev->dev, "%s free swap_en0_gpio %d\n",
+			__func__, pdata->swap_en0_gpio);
+		gpio_free(pdata->swap_en0_gpio);
+		pdata->swap_en0_gpio = 0;
+	}
 	msm_release_pinctrl(pdev);
 	devm_kfree(&pdev->dev, pdata);
 	return ret;
@@ -7384,6 +7602,8 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 				snd_soc_card_get_drvdata(card);
 
 	gpio_free(pdata->us_euro_gpio);
+	gpio_free(pdata->swap_en1_gpio);
+	gpio_free(pdata->swap_en0_gpio);
 	i2s_auxpcm_deinit();
 
 	snd_soc_unregister_card(card);

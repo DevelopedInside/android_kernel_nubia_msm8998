@@ -9,6 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define DEBUG
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -45,7 +46,11 @@
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
 #define GND_MIC_SWAP_THRESHOLD 4
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
+#ifdef CONFIG_ZTEMT_AUDIO
+#define HS_VREF_MIN_VAL 1300
+#else
 #define HS_VREF_MIN_VAL 1400
+#endif
 #define FW_READ_ATTEMPTS 15
 #define FW_READ_TIMEOUT 4000000
 #define FAKE_REM_RETRY_ATTEMPTS 3
@@ -1225,6 +1230,10 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 		pr_debug("%s: cross con found, start polling\n",
 			 __func__);
 		plug_type = MBHC_PLUG_TYPE_GND_MIC_SWAP;
+		if (mbhc->mbhc_cfg->msm_swap_set &&
+			mbhc->mbhc_cfg->msm_swap_set(codec,1,1)) {
+			pr_debug("%s: msm_swap_set to (1,1)\n", __func__);
+		}
 		pr_debug("%s: Plug found, plug type is %d\n",
 			 __func__, plug_type);
 		goto correct_plug_type;
@@ -1348,10 +1357,9 @@ correct_plug_type:
 				 * if switch is toggled, check again,
 				 * otherwise report unsupported plug
 				 */
-				if (mbhc->mbhc_cfg->swap_gnd_mic &&
-					mbhc->mbhc_cfg->swap_gnd_mic(codec)) {
-					pr_debug("%s: US_EU gpio present,flip switch\n"
-						, __func__);
+				if (mbhc->mbhc_cfg->msm_swap_set &&
+					mbhc->mbhc_cfg->msm_swap_set(codec,1,1)) {
+					pr_debug("%s: msm_swap_set to (1,1)\n", __func__);
 					continue;
 				}
 			}
@@ -1563,6 +1571,12 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 
 	if ((mbhc->current_plug == MBHC_PLUG_TYPE_NONE) &&
 	    detection_type) {
+	       //wangchong:open switch, set 00 (default US)
+	       if (mbhc->mbhc_cfg->msm_swap_set){
+			pr_debug("%s: msm_swap_set to (0,0)\n", __func__);
+			mbhc->mbhc_cfg->msm_swap_set(codec,0,0);
+		}
+
 		/* Make sure MASTER_BIAS_CTL is enabled */
 		mbhc->mbhc_cb->mbhc_bias(codec, true);
 
@@ -1649,6 +1663,12 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 						 0);
 			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_ELECT_SCHMT_ISRC, 0);
 			wcd_mbhc_report_plug(mbhc, 0, SND_JACK_ANC_HEADPHONE);
+		}
+
+		//wangchong:close switch
+		if (mbhc->mbhc_cfg->msm_swap_set) {
+			pr_debug("%s: msm_swap_set to (0,1)\n", __func__);
+			mbhc->mbhc_cfg->msm_swap_set(codec,0,1);
 		}
 	} else if (!detection_type) {
 		/* Disable external voltage source to micbias if present */
@@ -2198,8 +2218,13 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_INSREM_DBNC, 6);
 	}
 
+#ifdef CONFIG_ZTEMT_AUDIO
+	/* Button Debounce set to 32ms */
+	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_DBNC, 3);
+#else
 	/* Button Debounce set to 16ms */
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_BTN_DBNC, 2);
+#endif
 
 	/* Enable micbias ramp */
 	if (mbhc->mbhc_cb->mbhc_micb_ramp_control)

@@ -622,14 +622,6 @@ static int smb138x_set_parallel_suspend(struct smb138x *chip, bool suspend)
 	struct smb_charger *chg = &chip->chg;
 	int rc = 0;
 
-	rc = smblib_masked_write(chg, WD_CFG_REG, WDOG_TIMER_EN_BIT,
-				 suspend ? 0 : WDOG_TIMER_EN_BIT);
-	if (rc < 0) {
-		pr_err("Couldn't %s watchdog rc=%d\n",
-		       suspend ? "disable" : "enable", rc);
-		suspend = true;
-	}
-
 	rc = smblib_masked_write(chg, USBIN_CMD_IL_REG, USBIN_SUSPEND_BIT,
 				 suspend ? USBIN_SUSPEND_BIT : 0);
 	if (rc < 0) {

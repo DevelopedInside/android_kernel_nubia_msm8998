@@ -82,4 +82,16 @@ config QPNP_QNOVO
 	  module. It also allows userspace code to read diagnostics of voltage
 	  and current measured during certain phases of the pulses.
 
+config TYPEC_AUDIO_ADAPTER_SWITCH
+	bool "Type C audio apapter switch"
+	depends on SPMI
+	help
+	  Say Y here to enable typec audio adpater switch controller.
+
+config NUBIA_CHARGE_FEATURE
+	bool "nubia charge feature support"
+	depends on SPMI
+	help
+	  Say Y here to enable nubia charge feature support.
+
 endmenu
