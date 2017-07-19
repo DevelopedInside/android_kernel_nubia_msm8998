@@ -260,13 +260,13 @@ static void pack_rsp_and_send(unsigned char *buf, int len,
 
 	if (info && info->peripheral_mask) {
 		if (info->peripheral_mask == DIAG_CON_ALL ||
-		(info->peripheral_mask & (1 << APPS_DATA)) ||
-		(info->peripheral_mask & (1 << PERIPHERAL_MODEM))) {
+			(info->peripheral_mask & (1 << APPS_DATA)) ||
+			(info->peripheral_mask & (1 << PERIPHERAL_MODEM))) {
 			rsp_ctxt = SET_BUF_CTXT(APPS_DATA, TYPE_CMD, 1);
 		} else {
 			for (i = 0; i <= NUM_PERIPHERALS; i++) {
 				if (info->peripheral_mask & (1 << i))
-				break;
+					break;
 			}
 			rsp_ctxt = SET_BUF_CTXT(i, TYPE_CMD, 1);
 		}
@@ -344,15 +344,15 @@ static void encode_rsp_and_send(unsigned char *buf, int len,
 
 	if (info && info->peripheral_mask) {
 		if (info->peripheral_mask == DIAG_CON_ALL ||
-		(info->peripheral_mask & (1 << APPS_DATA)) ||
-		(info->peripheral_mask & (1 << PERIPHERAL_MODEM))) {
+			(info->peripheral_mask & (1 << APPS_DATA)) ||
+			(info->peripheral_mask & (1 << PERIPHERAL_MODEM))) {
 			rsp_ctxt = SET_BUF_CTXT(APPS_DATA, TYPE_CMD, 1);
 		} else {
 			for (i = 0; i <= NUM_PERIPHERALS; i++) {
-			if (info->peripheral_mask & (1 << i))
-			break;
-		}
-		rsp_ctxt = SET_BUF_CTXT(i, TYPE_CMD, 1);
+				if (info->peripheral_mask & (1 << i))
+					break;
+			}
+			rsp_ctxt = SET_BUF_CTXT(i, TYPE_CMD, 1);
 		}
 	} else
 		rsp_ctxt = driver->rsp_buf_ctxt;
@@ -1614,6 +1614,8 @@ int diagfwd_init(void)
 	driver->supports_separate_cmdrsp = 1;
 	driver->supports_apps_hdlc_encoding = 1;
 	driver->supports_apps_header_untagging = 1;
+	for (i = 0; i < NUM_PERIPHERALS; i++)
+		driver->peripheral_untag[i] = 0;
 	mutex_init(&driver->diag_hdlc_mutex);
 	mutex_init(&driver->diag_cntl_mutex);
 	mutex_init(&driver->mode_lock);
