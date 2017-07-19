@@ -448,7 +448,6 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 		split_fcc(chip, total_fcc_ua, &master_fcc_ua, &slave_fcc_ua);
 	}
 #else
-	if (chip->pl_mode != POWER_SUPPLY_PL_NONE) {
 		split_fcc(chip, total_fcc_ua, &master_fcc_ua, &slave_fcc_ua);
 #endif
 		pval.intval = slave_fcc_ua;
@@ -468,7 +467,6 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 		if (rc < 0) {
 			pr_err("Could not set main fcc, rc=%d\n", rc);
 			return rc;
-		}
 	}
 
 	pl_dbg(chip, PR_PARALLEL, "master_fcc=%d slave_fcc=%d distribution=(%d/%d)\n",
