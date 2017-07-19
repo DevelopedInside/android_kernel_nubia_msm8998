@@ -2549,6 +2549,13 @@ static int msm_cpp_cfg_frame(struct cpp_device *cpp_dev,
 		return -EINVAL;
 	}
 
+	if (stripe_base == UINT_MAX || new_frame->num_strips >
+		(UINT_MAX - 1 - stripe_base) / stripe_size) {
+		pr_err("Invalid frame message,num_strips %d is large\n",
+			new_frame->num_strips);
+		return -EINVAL;
+	}
+
 	if ((stripe_base + new_frame->num_strips * stripe_size + 1) !=
 		new_frame->msg_len) {
 		pr_err("Invalid frame message,len=%d,expected=%d\n",
@@ -4235,8 +4242,8 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		cmd = MSM_SD_SHUTDOWN;
 		break;
 	default:
-		pr_err_ratelimited("%s: unsupported compat type :%x\n",
-			__func__, cmd);
+		pr_err_ratelimited("%s: unsupported compat type :%x LOAD %lu\n",
+				__func__, cmd, VIDIOC_MSM_CPP_LOAD_FIRMWARE);
 		mutex_unlock(&cpp_dev->mutex);
 		return -EINVAL;
 	}
@@ -4268,8 +4275,8 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	case MSM_SD_UNNOTIFY_FREEZE:
 		break;
 	default:
-		pr_err_ratelimited("%s: unsupported compat type :%x\n",
-			__func__, cmd);
+		pr_err_ratelimited("%s: unsupported compat type :%d\n",
+				__func__, cmd);
 		return -EINVAL;
 	}
 
