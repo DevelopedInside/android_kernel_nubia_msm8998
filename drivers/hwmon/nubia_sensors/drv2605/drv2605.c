@@ -737,11 +737,6 @@ fail0:
 	return reval;
 }
 
-void set_vibrate(int value)
-{
-	vibrator_enable(&to_dev, value);
-}
-
 static void dev_init_platform_data(struct drv2605_data *pDrv2605data)
 {
 	struct drv2605_platform_data *pDrv2605Platdata = &pDrv2605data->PlatData;
