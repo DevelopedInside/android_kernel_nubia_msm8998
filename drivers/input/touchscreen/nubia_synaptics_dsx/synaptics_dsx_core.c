@@ -155,6 +155,8 @@ static int synaptics_rmi4_power_notifier_cb(struct notifier_block *self,
 		unsigned long event, void *data);
 #endif
 
+static bool remap_enable;
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #ifndef CONFIG_FB
 #define USE_EARLYSUSPEND
@@ -231,6 +233,12 @@ static ssize_t synaptics_rmi4_swap_buttons_show(struct device *dev,
 		struct device_attribute *attr, char *buf);
 
 static ssize_t synaptics_rmi4_swap_buttons_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
+
+static ssize_t synaptics_rmi4_remap_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+
+static ssize_t synaptics_rmi4_remap_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count);
 
 static ssize_t synaptics_rmi4_virtual_key_map_show(struct kobject *kobj,
@@ -706,6 +714,11 @@ static struct device_attribute attrs[] = {
 	__ATTR(swap_buttons, (S_IRUGO | S_IWUSR),
 			synaptics_rmi4_swap_buttons_show,
 			synaptics_rmi4_swap_buttons_store),
+
+	__ATTR(remap_enable, (S_IRUGO | S_IWUSR),
+			synaptics_rmi4_remap_enable_show,
+			synaptics_rmi4_remap_enable_store),
+
 	__ATTR(hw_sw_reset, S_IRUGO,
 			synaptics_rmi4_hw_sw_reset_show,
 			synaptics_rmi4_store_error),
@@ -730,6 +743,29 @@ static ssize_t synaptics_rmi4_swap_buttons_store(struct device *dev,
 		return -EINVAL;
 
 	rmi4_data->swap_buttons = (input > 0);
+
+	return count;
+}
+
+static ssize_t synaptics_rmi4_remap_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	//struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+			remap_enable);
+}
+
+static ssize_t synaptics_rmi4_remap_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int input;
+	//struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+
+	if (sscanf(buf, "%u", &input) != 1)
+		return -EINVAL;
+
+	remap_enable = (input > 0);
 
 	return count;
 }
@@ -1254,6 +1290,9 @@ static int report_palm_event(struct synaptics_rmi4_data *rmi4_data)
 
 static int synaptics_rmi4_remap_check(int x)
 {
+	if(!remap_enable)
+		return 0;
+	
 	if (x < NUBIA_SCREEN_SLOP / 2) {
 		return 1;
 	}
@@ -1267,6 +1306,9 @@ static int synaptics_rmi4_remap_check(int x)
 
 static int synaptics_rmi4_remap_position_x(int x)
 {
+	if(!remap_enable)
+		return x;
+
 	if (x < NUBIA_SCREEN_LEFT_EDGE) {
 		return x * 2 - NUBIA_SCREEN_LEFT_EDGE;
 	}
