@@ -341,6 +341,7 @@ struct synaptics_dsx_pinctrl {
  * @reset_device: pointer to device reset function
  * @irq_enable: pointer to interrupt enable function
  * @sleep_enable: pointer to sleep enable function
+ * @swap_buttons: flag to indicate whether to swap left and right buttons
  */
 struct synaptics_rmi4_data {
 	bool tp_reset_start;
@@ -424,6 +425,7 @@ struct synaptics_rmi4_data {
 	bool palm_suspend;
 	bool palm_sleep;
 #endif
+	bool swap_buttons;
 //nubia for pinctrl
 #ifdef NUBIA_SYNAPTICS_PINCTRL
 	struct synaptics_dsx_pinctrl pinctrl_info;
