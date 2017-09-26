@@ -199,5 +199,11 @@
 		qcom,mdss-dsi-min-refresh-rate = <53>;
 		qcom,mdss-dsi-max-refresh-rate = <60>;
 		qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+
+		cm,mdss-livedisplay-cabc-cmd = [
+			39 01 00 00 00 00 02 55 00];
+		cm,mdss-livedisplay-cabc-ui-value = <0x01>;
+		cm,mdss-livedisplay-cabc-image-value = <0x02>;
+		cm,mdss-livedisplay-cabc-video-value = <0x03>;
 	};
 };
