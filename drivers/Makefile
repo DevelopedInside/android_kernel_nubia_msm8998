@@ -81,6 +81,7 @@ obj-$(CONFIG_SOUNDWIRE)		+= soundwire/
 obj-y				+= hsi/
 #nubia change hwmon
 obj-$(CONFIG_HWMON)		+= hwmon/
+obj-$(CONFIG_NUBIA_HW_VERSION)         += nubia_hw_version/
 obj-y				+= net/
 obj-$(CONFIG_ATM)		+= atm/
 obj-$(CONFIG_FUSION)		+= message/
