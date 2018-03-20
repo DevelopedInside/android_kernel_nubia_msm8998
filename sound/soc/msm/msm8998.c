@@ -423,7 +423,8 @@ static char const *usb_sample_rate_text[] = {"KHZ_8", "KHZ_11P025",
 					"KHZ_88P2", "KHZ_96", "KHZ_176P4",
 					"KHZ_192", "KHZ_352P8", "KHZ_384"};
 static char const *ext_disp_sample_rate_text[] = {"KHZ_48", "KHZ_96",
-						  "KHZ_192"};
+					"KHZ_192", "KHZ_32", "KHZ_44P1",
+					"KHZ_88P2", "KHZ_176P4"};
 static char const *tdm_ch_text[] = {"One", "Two", "Three", "Four",
 				    "Five", "Six", "Seven", "Eight"};
 static char const *tdm_bit_format_text[] = {"S16_LE", "S24_LE", "S32_LE"};
@@ -1516,6 +1517,22 @@ static int ext_disp_rx_sample_rate_get(struct snd_kcontrol *kcontrol,
 		return idx;
 
 	switch (ext_disp_rx_cfg[idx].sample_rate) {
+	case SAMPLING_RATE_176P4KHZ:
+		sample_rate_val = 6;
+		break;
+
+	case SAMPLING_RATE_88P2KHZ:
+		sample_rate_val = 5;
+		break;
+
+	case SAMPLING_RATE_44P1KHZ:
+		sample_rate_val = 4;
+		break;
+
+	case SAMPLING_RATE_32KHZ:
+		sample_rate_val = 3;
+		break;
+
 	case SAMPLING_RATE_192KHZ:
 		sample_rate_val = 2;
 		break;
@@ -1546,6 +1563,18 @@ static int ext_disp_rx_sample_rate_put(struct snd_kcontrol *kcontrol,
 		return idx;
 
 	switch (ucontrol->value.integer.value[0]) {
+	case 6:
+		ext_disp_rx_cfg[idx].sample_rate = SAMPLING_RATE_176P4KHZ;
+		break;
+	case 5:
+		ext_disp_rx_cfg[idx].sample_rate = SAMPLING_RATE_88P2KHZ;
+		break;
+	case 4:
+		ext_disp_rx_cfg[idx].sample_rate = SAMPLING_RATE_44P1KHZ;
+		break;
+	case 3:
+		ext_disp_rx_cfg[idx].sample_rate = SAMPLING_RATE_32KHZ;
+		break;
 	case 2:
 		ext_disp_rx_cfg[idx].sample_rate = SAMPLING_RATE_192KHZ;
 		break;
@@ -4182,9 +4211,6 @@ static void msm_aux_pcm_snd_shutdown(struct snd_pcm_substream *substream)
 			dev_err(rtd->card->dev,
 				"%s lpaif_tert_muxsel_virt_addr is NULL\n",
 				__func__);
-           //delete by nubia lxl start,resolve adsp subsys restart execption
-		   //auxpcm_intf_conf[index].ref_cnt++;
-           //delete by nubia lxl end,resolve adsp subsys restart execption
 		}
 	}
 	mutex_unlock(&auxpcm_intf_conf[index].lock);
@@ -4668,13 +4694,9 @@ static void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 	mutex_lock(&mi2s_intf_conf[index].lock);
 	if (--mi2s_intf_conf[index].ref_cnt == 0) {
 		ret = msm_mi2s_set_sclk(substream, false);
-		if (ret < 0) {
+		if (ret < 0)
 			pr_err("%s:clock disable failed for MI2S (%d); ret=%d\n",
 				__func__, index, ret);
-          // delete by nubia start,resolve adsp subsys restart execption
-          // mi2s_intf_conf[index].ref_cnt++;
-          // delete by nubia lxl end,resolve adsp subsys restart execption
-		}
 	}
 	mutex_unlock(&mi2s_intf_conf[index].lock);
 
