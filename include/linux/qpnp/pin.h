@@ -214,6 +214,10 @@ struct qpnp_pin_cfg {
  */
 int qpnp_pin_config(int gpio, struct qpnp_pin_cfg *param);
 
+#ifdef CONFIG_NUBIA_HW_GPIO_BY_PM
+int nubia_qpnp_pin_config(int gpio, uint32_t pull_v);
+#endif
+
 /**
  * qpnp_pin_map - Obtain Linux GPIO number from device spec
  * @name: Name assigned by the 'label' binding for the primary node.
