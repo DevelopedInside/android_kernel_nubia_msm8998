@@ -9,6 +9,10 @@
 
 #define I2C_SEQ_REG_SETTING_MAX   5
 
+//ZTEMT: fuyipeng modify for AF ----start
+#define	MSM_ACTUATOT_MAX_NAME (32)
+//ZTEMT: fuyipeng modify for AF ----end
+
 #define MSM_SENSOR_MCLK_8HZ   8000000
 #define MSM_SENSOR_MCLK_16HZ  16000000
 #define MSM_SENSOR_MCLK_24HZ  24000000
@@ -63,6 +67,17 @@ enum msm_sensor_resolution_t {
 	MSM_SENSOR_RES_5,
 	MSM_SENSOR_RES_6,
 	MSM_SENSOR_RES_7,
+    // ZTEMT: fuyipeng add the res -----start
+	MSM_SENSOR_RES_8,
+	MSM_SENSOR_RES_9,
+	MSM_SENSOR_RES_10,
+	MSM_SENSOR_RES_11,
+	MSM_SENSOR_RES_12,
+	MSM_SENSOR_RES_13,
+	MSM_SENSOR_RES_14,
+	MSM_SENSOR_RES_15,
+	MSM_SENSOR_RES_16,
+    // ZTEMT: fuyipeng add the res -----end
 	MSM_SENSOR_INVALID_RES,
 };
 
@@ -263,6 +278,7 @@ enum eeprom_cfg_type_t {
 	CFG_EEPROM_WRITE_DATA,
 	CFG_EEPROM_GET_MM_INFO,
 	CFG_EEPROM_INIT,
+	CFG_EEPROM_DO_CALIBRATION,//ZTEMT:zhouruoyu add for factory altek 3D calibration
 };
 
 struct eeprom_get_t {
@@ -345,7 +361,50 @@ enum msm_sensor_cfg_type_t {
 	CFG_WRITE_I2C_ARRAY_ASYNC,
 	CFG_WRITE_I2C_ARRAY_SYNC,
 	CFG_WRITE_I2C_ARRAY_SYNC_BLOCK,
+/*ZTEMT: fengxun add for AL3200--------Start*/
+	CFG_MISP_LOAD_FIRMWARE,
+	CFG_WRITE_SPI_ARRAY,
+	CFG_MISP_BYPASS,
+/*ZTEMT: fengxun add for AL3200--------End*/
 };
+/*ZTEMT: fengxun add for AL3200--------Start*/
+/*D2 calibration profile*/
+#define ISPCMD_CAMERA_GET_SYSTEMINFORMATION	  0x3001
+#define ISPCMD_CAMERA_SET_BASICPARAMETERS		0x3002
+#define ISPCMD_CAMERA_GET_BASICPARAMETERS		0x3003
+
+#define ISPCMD_CAMERA_SET_SENSORMODE			 0x300A
+#define ISPCMD_CAMERA_GET_SENSORMODE			 0x300B
+#define ISPCMD_CAMERA_SET_OUTPUTFORMAT		   0x300D
+#define ISPCMD_CAMERA_PREVIEWSTREAMONOFF		 0x3010
+ 
+/* D2 Bulk Data*/
+#define ISPCMD_BULK_WRITE_BASICCODE			  0x2002
+#define ISPCMD_BULK_WRITE_ADVANCEDCODE		   0x2004
+#define ISPCMD_BULK_WRITE_BOOTCODE			   0x2008
+#define ISPCMD_BULK_READ_MEMORY				  0x2101
+#define ISPCMD_BULK_READ_COMLOG				  0x2102
+#define ISPCMD_BULK_WRITE_CALIBRATION_DATA	   0x210B
+
+/*D2 basic setting*/
+#define ISPCMD_BASIC_SET_DEPTH_3A_INFO		   0x10B9
+#define ISPCMD_BASIC_SET_DEPTH_INPUT_WOL		 0x10BB
+
+/*D2 system cmd*/
+#define ISPCMD_SYSTEM_CHANGEMODE				 0x0010
+#define ISPCMD_SYSTEM_GET_STATUSOFMODECHANGE	 0x0011
+#define ISPCMD_SYSTEM_GET_STATUSOFLASTEXECUTEDCOMMAND  0x0015
+#define ISPCMD_SYSTEM_GET_ERRORCODE			  0x0016
+#define ISPCMD_SYSTEM_SET_ISPREGISTER			0x0100
+#define ISPCMD_SYSTEM_GET_ISPREGISTER			0x0101
+#define ISPCMD_SYSTEM_SET_COMLOGLEVEL			0x0109
+#define ISPCMD_SYSTEM_GET_CHIPTESTREPORT		 0x010A
+#define ISPCMD_SYSTEM_GET_IRQSTATUS			   0x0113
+#define ISPCMD_SYSTEM_GET_POLLINGCOMMANDSTATUS   0x0114
+
+/*operarion code*/
+#define ISPCMD_MINIISPOPEN 0x4000
+/*ZTEMT: fengxun add for AL3200--------End*/
 
 enum msm_actuator_cfg_type_t {
 	CFG_GET_ACTUATOR_INFO,
@@ -356,6 +415,9 @@ enum msm_actuator_cfg_type_t {
 	CFG_ACTUATOR_POWERDOWN,
 	CFG_ACTUATOR_POWERUP,
 	CFG_ACTUATOR_INIT,
+      // ZTEMT: fuyipeng add for AF -----start
+      CFG_SET_ACTUATOR_NAME,
+      // ZTEMT: fuyipeng add for AF -----end
 };
 
 struct msm_ois_opcode {
@@ -495,10 +557,12 @@ struct msm_ois_cfg_download_data {
 };
 
 struct msm_actuator_set_position_t {
-	uint16_t number_of_steps;
-	uint32_t hw_params;
-	uint16_t pos[MAX_NUMBER_OF_STEPS];
-	uint16_t delay[MAX_NUMBER_OF_STEPS];
+    uint16_t number_of_steps;
+    uint32_t hw_params;
+    uint16_t pos[MAX_NUMBER_OF_STEPS];
+    uint16_t delay[MAX_NUMBER_OF_STEPS];
+    int16_t  dac_output; //jixd add for reset optimize
+    uint8_t  use_dac_value; //jixd add for reset optimize
 };
 
 struct msm_actuator_cfg_data {
@@ -510,6 +574,9 @@ struct msm_actuator_cfg_data {
 		struct msm_actuator_get_info_t get_info;
 		struct msm_actuator_set_position_t setpos;
 		enum af_camera_name cam_name;
+            // ZTEMT: fuyipeng add for manual AF -----start
+            char act_name[MSM_ACTUATOT_MAX_NAME];
+            // ZTEMT: fuyipeng add for manual AF -----end
 	} cfg;
 };
 

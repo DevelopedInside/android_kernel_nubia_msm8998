@@ -25,6 +25,13 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
+/*ZTEMT: fengxun add for dual camera--------Start*/
+#ifdef CONFIG_AL3200
+extern int imx362_state;
+extern int imx318_state;
+#endif
+/*ZTEMT: fengxun add for dual camera--------End*/
+
 int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 	int num_vreg, struct msm_sensor_power_setting *power_setting,
 	uint16_t power_setting_size)
@@ -1659,10 +1666,24 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 			if (!ctrl->gpio_conf->gpio_num_info->valid
 				[pd->seq_val])
 				continue;
-			gpio_set_value_cansleep(
-				ctrl->gpio_conf->gpio_num_info->gpio_num
-				[pd->seq_val],
-				(int) pd->config_val);
+/*ZTEMT: fengxun add for dual camera--------Start*/
+#ifdef CONFIG_AL3200
+			if((imx362_state == 1)&&(imx318_state == 1)&&((pd->seq_val == SENSOR_GPIO_VANA)
+                    ||(pd->seq_val == SENSOR_GPIO_VAF))){
+				pr_err("%s dual camera power on break\n", __func__);
+				break;
+			}else{
+#endif
+/*ZTEMT: fengxun add for dualcamera--------End*/
+				gpio_set_value_cansleep(
+					ctrl->gpio_conf->gpio_num_info->gpio_num
+					[pd->seq_val],
+					(int) pd->config_val);
+/*ZTEMT: fengxun add for dualcamera--------Start*/
+#ifdef CONFIG_AL3200
+			}
+#endif
+/*ZTEMT: fengxun add for dualcamera--------End*/
 			break;
 		case SENSOR_VREG:
 			if (pd->seq_val == INVALID_VREG)
@@ -1692,11 +1713,25 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 			} else
 				pr_err("%s error in power up/down seq data\n",
 								__func__);
-			ret = msm_cam_sensor_handle_reg_gpio(pd->seq_val,
-				ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
-			if (ret < 0)
-				pr_err("ERR:%s Error while disabling VREG GPIO\n",
-					__func__);
+/*ZTEMT: fengxun add for dualcamera--------Start*/
+#ifdef CONFIG_AL3200
+			if((imx362_state == 1)&&(imx318_state == 1)&&((pd->seq_val == CAM_VIO)
+                    ||(pd->seq_val == CAM_VDIG)||(pd->seq_val == CAM_VANA))){
+				pr_err("%s dual camera power on break\n", __func__);
+				break;
+			}else{
+#endif
+/*ZTEMT: fengxun add for dualcamera--------End*/
+				ret = msm_cam_sensor_handle_reg_gpio(pd->seq_val,
+					ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
+				if (ret < 0)
+					pr_err("ERR:%s Error while disabling VREG GPIO\n",
+						__func__);
+/*ZTEMT: fengxun add for dualcamera--------Start*/
+#ifdef CONFIG_AL3200
+			}
+#endif
+/*ZTEMT: fengxun add for dualcamera--------End*/
 			break;
 		case SENSOR_I2C_MUX:
 			if (ctrl->i2c_conf && ctrl->i2c_conf->use_i2c_mux)
