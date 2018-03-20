@@ -215,7 +215,8 @@ dtb-$(CONFIG_ARCH_SDM630) += sdm630-rumi.dtb \
 	sdm630-pm660a-headset-jacktype-no-rcm.dtb
 
 ifeq ($(CONFIG_ARM64),y)
-always          := $(dtb-y)
+#always          := $(dtb-y)
+always          := $(ZTEMT_DTS_NAME)
 subdir-y        := $(dts-dirs)
 else
 targets += dtbs
