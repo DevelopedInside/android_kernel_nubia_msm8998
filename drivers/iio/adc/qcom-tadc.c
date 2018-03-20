@@ -280,6 +280,42 @@ static const struct tadc_pt tadc_therm_3450b_68k[] = {
 	{ 1712127,	-40000 },
 };
 
+static const struct tadc_pt tadc_therm_4150b_68k[] = {
+	{ 2354,		120000 },
+	{ 2697,		115000 },
+	{ 3101,		110000 },
+	{ 3578,		105000 },
+	{ 4145,		100000 },
+	{ 4821,		95000 },
+	{ 5630,		90000 },
+	{ 6604,		85000 },
+	{ 7781,		80000 },
+	{ 9212,		75000 },
+	{ 10959,	70000 },
+	{ 13105,	65000 },
+	{ 15756,	60000 },
+	{ 19049,	55000 },
+	{ 23166,	50000 },
+	{ 28346,	45000 },
+	{ 34910,	40000 },
+	{ 43285,	35000 },
+	{ 54051,	30000 },
+	{ 68000,	25000 },
+	{ 86221,	20000 },
+	{ 110229,	15000 },
+	{ 142150,	10000 },
+	{ 184998,	5000 },
+	{ 243096,	0 },
+	{ 322709,	-5000 },
+	{ 433032,	-10000 },
+	{ 587728,	-15000 },
+	{ 807370,	-20000 },
+	{ 1123378,	-25000 },
+	{ 1584451,	-30000 },
+	{ 2267270,	-35000 },
+	{ 3294597,	-40000 },
+};
+
 static bool tadc_is_reg_locked(struct tadc_chip *chip, u16 reg)
 {
 	if ((reg & 0xFF00) == chip->tadc_cmp_base)
@@ -514,6 +550,16 @@ static int tadc_do_conversion(struct tadc_chip *chip, u8 channels, s16 *adc)
 		tadc_write(chip, TADC_EN_CTL_REG(chip), 0x80);
 	}
 
+	rc = tadc_read(chip, TADC_EN_CTL_REG(chip), val, 1);
+	if (rc < 0) {
+		pr_err("Couldn't read en ctl error status rc=%d\n", rc);
+		goto unlock;
+	}
+	if (val[0] != 0x80) {
+		pr_err("re-enable tadc control.\n");
+		tadc_write(chip, TADC_EN_CTL_REG(chip), 0x80);
+	}
+
 	rc = tadc_write(chip, TADC_CONV_REQ_REG(chip), channels);
 	if (rc < 0) {
 		pr_err("Couldn't write conversion request rc=%d\n", rc);
@@ -535,6 +581,9 @@ static int tadc_do_conversion(struct tadc_chip *chip, u8 channels, s16 *adc)
 		 * has completed conversion
 		 */
 		if (val[0] != channels) {
+			pr_err("val[0]=0x%x\n", val[0]);
+			tadc_write(chip, TADC_EN_CTL_REG(chip), 0);
+			tadc_write(chip, TADC_EN_CTL_REG(chip), 0x80);
 			rc = -ETIMEDOUT;
 			goto unlock;
 		}
@@ -987,6 +1036,11 @@ static int tadc_set_therm_table(struct tadc_chan_data *chan_data, u32 beta,
 	if (beta == 3450 && rtherm == 68000) {
 		chan_data->table = tadc_therm_3450b_68k;
 		chan_data->tablesize = ARRAY_SIZE(tadc_therm_3450b_68k);
+		return 0;
+	}
+	else if(beta == 4150 && rtherm == 68000) {
+		chan_data->table = tadc_therm_4150b_68k;
+		chan_data->tablesize = ARRAY_SIZE(tadc_therm_4150b_68k);
 		return 0;
 	}
 
