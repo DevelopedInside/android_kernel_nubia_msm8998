@@ -3460,7 +3460,7 @@ static struct fg_irq_info fg_irqs[FG_IRQ_MAX] = {
 	},
 	[MSOC_DELTA_IRQ] = {
 		.name		= "msoc-delta",
-		.handler	= fg_delta_msoc_irq_handler,
+		.handler        = fg_delta_msoc_irq_handler,
 		.wakeable	= true,
 	},
 	[BSOC_DELTA_IRQ] = {
