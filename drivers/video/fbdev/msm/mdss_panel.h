@@ -840,7 +840,12 @@ struct mdss_panel_info {
 	struct ion_handle *splash_ihdl;
 	int panel_power_state;
 	int compression_mode;
-
+#ifdef CONFIG_NUBIA_LCD_DISP_PREFERENCE
+	int panel_ready_for_cmd;
+#endif
+#ifdef CONFIG_NUBIA_LCD_BACKLIGHT_CURVE
+	uint32_t backlight_curve[256];
+#endif
 	uint32_t panel_dead;
 	u32 panel_force_dead;
 	u32 panel_orientation;
