@@ -864,9 +864,13 @@ static const char *fg_get_battery_type(struct fg_chip *chip)
 static int fg_batt_missing_config(struct fg_chip *chip, bool enable)
 {
 	int rc;
-
+#if defined(CONFIG_NEO_EXTERNAL_FG_SUPPORT)
+	rc = fg_masked_write(chip, BATT_INFO_BATT_MISS_CFG(chip),
+			BM_BATT_ID_TH_MASK | BM_FROM_BATT_ID_BIT, enable ? BM_FROM_THERM_BIT : 0);
+#else
 	rc = fg_masked_write(chip, BATT_INFO_BATT_MISS_CFG(chip),
 			BM_FROM_BATT_ID_BIT, enable ? BM_FROM_BATT_ID_BIT : 0);
+#endif
 	if (rc < 0)
 		pr_err("Error in writing to %04x, rc=%d\n",
 			BATT_INFO_BATT_MISS_CFG(chip), rc);

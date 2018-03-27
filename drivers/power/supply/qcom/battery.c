@@ -349,7 +349,9 @@ done:
  *  FCC  *
 **********/
 #define EFFICIENCY_PCT	80
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 #define MIN_SPLIT_CHANGE_CURRENT_UA		300000
+#endif
 static void split_fcc(struct pl_data *chip, int total_ua,
 			int *master_ua, int *slave_ua)
 {
@@ -397,6 +399,7 @@ static void split_fcc(struct pl_data *chip, int total_ua,
 	 * the main charger's FCC to the votable result.
 	 */
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	*slave_ua = min(*slave_ua, total_ua - MIN_SPLIT_CHANGE_CURRENT_UA);
 	if (chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN)
 		*master_ua = max(MIN_SPLIT_CHANGE_CURRENT_UA, total_ua);
 	else
@@ -432,9 +435,14 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 			pr_err("Couldn't set main fcc, rc=%d\n", rc);
 		return rc;
 	}
-
 	if (chip->pl_mode != POWER_SUPPLY_PL_NONE) {
+	#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+		if(total_fcc_ua >= MIN_SPLIT_CHANGE_CURRENT_UA) {
+			split_fcc(chip, total_fcc_ua, &master_fcc_ua, &slave_fcc_ua);
+		}
+	#else
 		split_fcc(chip, total_fcc_ua, &master_fcc_ua, &slave_fcc_ua);
+	#endif
 
 		pval.intval = slave_fcc_ua;
 		rc = power_supply_set_property(chip->pl_psy,
@@ -444,7 +452,6 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 			pr_err("Couldn't set parallel fcc, rc=%d\n", rc);
 			return rc;
 		}
-
 		chip->slave_fcc_ua = slave_fcc_ua;
 
 		pval.intval = master_fcc_ua;

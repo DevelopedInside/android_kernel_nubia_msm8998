@@ -402,7 +402,6 @@ static int smb2_parse_dt(struct smb2 *chip)
 
 	chg->suspend_input_on_debug_batt = of_property_read_bool(node,
 					"qcom,suspend-input-on-debug-batt");
-
 	rc = of_property_read_u32(node, "qcom,otg-deglitch-time-ms",
 					&chg->otg_delay_ms);
 	if (rc < 0)
@@ -431,6 +430,21 @@ static int smb2_pre_parse_dt(struct smb2 *chip)
 	chg->switch_select = of_get_named_gpio(node, "qcom,switch-select-gpio", 0);
 
 	chg->mbhc_int = of_get_named_gpio(node, "qcom,mbhc-int-gpio", 0);
+
+	chg->bat_temp_limit_support = of_property_read_bool(node,
+					"qcom,bat-temp-limit-support");
+
+	of_property_read_u32(node, "qcom,bat-temp-limit-current",
+				&chg->bat_temp_limit_current);
+
+	of_property_read_u32(node, "qcom,bat-temp-jeita-current",
+				&chg->bat_temp_jeita_current);
+
+	of_property_read_u32(node, "qcom,bat-temp-limit-threshold",
+				&chg->bat_temp_limit_threshold);
+
+	of_property_read_u32(node, "qcom,bat-temp-limit-voltage",
+				&chg->bat_temp_limit_voltage);
 
 	return 0;
 }
@@ -480,7 +494,12 @@ static int smb2_usb_get_prop(struct power_supply *psy,
 			rc = smblib_get_prop_usb_present(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
+	#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+		rc = smblib_get_prop_usb_present(chg, val);
+	#else
 		rc = smblib_get_prop_usb_online(chg, val);
+	#endif
+
 		if (!val->intval)
 			break;
 
@@ -1219,6 +1238,9 @@ static int smb2_batt_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property psp)
 {
 	switch (psp) {
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+	case POWER_SUPPLY_PROP_STATUS:
+#endif
 	case POWER_SUPPLY_PROP_INPUT_SUSPEND:
 	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
 	case POWER_SUPPLY_PROP_CAPACITY:
@@ -1691,7 +1713,9 @@ static int smb2_init_hw(struct smb2 *chip)
 			chg->micro_usb_mode, 0);
 	vote(chg->hvdcp_enable_votable, MICRO_USB_VOTER,
 			chg->micro_usb_mode, 0);
-
+#if defined(CONFIG_DIRECT_QC_COMPATIBLE_FEATURE)
+	vote(chg->hvdcp_disable_votable_indirect, DC_USBIN_VOTER, true, 0);
+#endif
 	/*
 	 * AICL configuration:
 	 * start from min and AICL ADC disable
