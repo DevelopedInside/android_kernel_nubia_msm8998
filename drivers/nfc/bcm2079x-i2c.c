@@ -202,7 +202,7 @@ static ssize_t bcm2079x_dev_read(struct file *filp, char __user *buf,
 	struct bcm2079x_dev_t *bcm2079x_dev = filp->private_data;
 	unsigned char tmp[MAX_BUFFER_SIZE];
 	int total;
-	//dev_info(&bcm2079x_dev->client->dev,"bcm2079x_dev_read\n");
+	dev_info(&bcm2079x_dev->client->dev,"bcm2079x_dev_read\n");
 
 	total = 0;
 
@@ -225,7 +225,7 @@ static ssize_t bcm2079x_dev_read(struct file *filp, char __user *buf,
 			"failed to copy to user space, total = %d\n", total);
 		total = -EFAULT;
 	}
-    //dev_info(&bcm2079x_dev->client->dev, "r:%d c:%zu, 0x%02x, 0x%02x, 0x%02x", total, count, tmp[0], tmp[1], tmp[2]);
+    dev_info(&bcm2079x_dev->client->dev, "r:%d c:%zu, 0x%02x, 0x%02x, 0x%02x", total, count, tmp[0], tmp[1], tmp[2]);
 	return total;
 }
 
@@ -235,7 +235,7 @@ static ssize_t bcm2079x_dev_write(struct file *filp, const char __user *buf,
 	struct bcm2079x_dev_t *bcm2079x_dev = filp->private_data;
 	char tmp[MAX_BUFFER_SIZE];
 	int ret;
-//	dev_info(&bcm2079x_dev->client->dev,"bcm2079x_dev_write\n");
+	dev_info(&bcm2079x_dev->client->dev,"bcm2079x_dev_write\n");
 
 	if (count > MAX_BUFFER_SIZE) {
 		dev_err(&bcm2079x_dev->client->dev, "out of memory\n");
@@ -258,7 +258,7 @@ static ssize_t bcm2079x_dev_write(struct file *filp, const char __user *buf,
 		ret = -EIO;
 	}
 	mutex_unlock(&bcm2079x_dev->read_mutex);
-  //  dev_info(&bcm2079x_dev->client->dev, "w:%zu, 0x%02x, 0x%02x, 0x%02x", count, tmp[0], tmp[1], tmp[2]);
+    dev_info(&bcm2079x_dev->client->dev, "w:%zu, 0x%02x, 0x%02x, 0x%02x", count, tmp[0], tmp[1], tmp[2]);
 	//printk("[dsc]write data ,length =%d \n",ret);
 	//print_hex_dump(KERN_DEBUG, " write: ", DUMP_PREFIX_NONE, 16, 1, tmp, ret, false);
 
