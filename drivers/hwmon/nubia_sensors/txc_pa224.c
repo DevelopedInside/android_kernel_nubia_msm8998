@@ -1399,7 +1399,7 @@ static void sensor_platform_hw_exit(void)
 	if (data == NULL)
 		return;
 
-	sensor_regulator_configure(data, false);
+	//sensor_regulator_configure(data, false);
 
 	if (gpio_is_valid(data->platform_data->irq_gpio))
 		gpio_free(data->platform_data->irq_gpio);

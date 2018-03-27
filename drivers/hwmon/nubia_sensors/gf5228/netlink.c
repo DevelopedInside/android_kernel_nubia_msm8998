@@ -10,11 +10,11 @@
 #include <linux/types.h>
 #include <net/sock.h>
 #include <net/netlink.h>
+#include "gf_spi.h"
 
 #define NETLINK_TEST 25
 #define MAX_MSGSIZE 32
 
-void sendnlmsg(char *msg);
 static int pid = -1;
 struct sock *nl_sk = NULL;
 

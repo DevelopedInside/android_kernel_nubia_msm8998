@@ -57,6 +57,7 @@ enum FP_MODE{
 #define GF_KEY_INPUT_BACK		KEY_BACK
 #define GF_KEY_INPUT_POWER		KEY_POWER
 #define GF_KEY_INPUT_CAMERA		KEY_CAMERA
+#define GF_KEY_INPUT_F3			KEY_F3
 
 #if defined(SUPPORT_NAV_EVENT)
 typedef enum gf_nav_event {

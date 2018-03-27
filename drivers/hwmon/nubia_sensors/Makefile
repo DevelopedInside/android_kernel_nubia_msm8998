@@ -12,3 +12,7 @@ obj-$(CONFIG_NUBIA_SENSORS_HALL_DEVICE)  		+= hall_device.o
 obj-$(CONFIG_NUBIA_SENSORS_IR_REMOTE_I_THREE)		+= i_three.o
 #--------------------------vibrator-------------------------------------#
 obj-$(CONFIG_NUBIA_SENSOR_VIBRATOR)			+= drv2605/
+#--------------------------OPTICAL KEY LEFT-------------------------------------#
+obj-$(CONFIG_NUBIA_SENSORS_OPTICAL_KEY_LEFT)		+= left_optical_key.o
+#--------------------------OPTICAL KEY RIGHT-------------------------------------#
+obj-$(CONFIG_NUBIA_SENSORS_OPTICAL_KEY_RIGHT)		+= right_optical_key.o

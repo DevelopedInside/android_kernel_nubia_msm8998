@@ -154,6 +154,16 @@ int gf_parse_dts(struct gf_dev* gf_dev)
 void gf_cleanup(struct gf_dev	* gf_dev)
 {
 	FP_LOG_INFO("[info] %s\n",__func__);
+	if (gpio_is_valid(gf_dev->pwr_gpio_vdd))
+	{
+		gpio_free(gf_dev->pwr_gpio_vdd);
+		FP_LOG_INFO("remove pwr_gpio_vdd success\n");
+	}
+	if (gpio_is_valid(gf_dev->pwr_gpio_vddio))
+	{
+		gpio_free(gf_dev->pwr_gpio_vddio);
+		FP_LOG_INFO("remove pwr_gpio_vddio success\n");
+	}
 	if (gpio_is_valid(gf_dev->irq_gpio))
 	{
 		gpio_free(gf_dev->irq_gpio);
@@ -196,6 +206,9 @@ int gf_power_off(struct gf_dev* gf_dev)
 	if (gpio_is_valid(gf_dev->pwr_gpio_vddio)) {
 		gpio_set_value(gf_dev->pwr_gpio_vddio, 0);
 	}
+
+	gf_cleanup(gf_dev); //free gpio resource
+
 	FP_LOG_INFO("power off\n");
 	return rc;
 }

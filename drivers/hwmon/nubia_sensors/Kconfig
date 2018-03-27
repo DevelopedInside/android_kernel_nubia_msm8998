@@ -90,6 +90,23 @@ config NUBIA_SENSORS_FP_FPC1020_PLATFORM
           If you want FPC1020 work as PLATFORM device, select it.
 
 endchoice
+
+################################################# OPTICAL_KEY_LEFT START
+config NUBIA_SENSORS_OPTICAL_KEY_LEFT
+	tristate "support optical key left pa224 driver"
+	depends on NUBIA_SENSORS
+	default n
+	help
+		nubia device of optical key left
+
+################################################# OPTICAL_KEY_RIGHT START
+config NUBIA_SENSORS_OPTICAL_KEY_RIGHT
+	tristate "support optical key right pa224 driver"
+	depends on NUBIA_SENSORS
+	default n
+	help
+		nubia device of optical key right
+
 ################################################# FINGER_PRINTER_FPC1020 END
 ################################################# FINGER_PRINTER_GF5216M START
 source drivers/hwmon/nubia_sensors/gf5228/Kconfig
