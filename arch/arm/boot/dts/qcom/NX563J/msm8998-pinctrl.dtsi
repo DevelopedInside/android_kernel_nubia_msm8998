@@ -801,6 +801,19 @@
 					bias-pull-down;
 				};
 			};
+
+			pcie0_wake_sleep: pcie0_wake_sleep {
+				mux {
+					pins = "gpio37";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio37";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
 		};
 
 		hph_en0_ctrl {
@@ -1209,7 +1222,7 @@
 
 			config {
 				pins = "gpio26", "gpio126";
-				bias-disable;
+				bias-pull-up;
 				drive-strength = <2>; /* 2 MA */
 			};
 		};
@@ -1230,7 +1243,7 @@
 		cam_sensor_mclk0_active: cam_sensor_mclk0_active {
 			/* MCLK0 */
 			mux {
-				/* CLK, DATA */
+				/* CLK */
 				pins = "gpio13";
 				function = "cam_mclk";
 			};
@@ -1245,7 +1258,7 @@
 		cam_sensor_mclk0_suspend: cam_sensor_mclk0_suspend {
 			/* MCLK0 */
 			mux {
-				/* CLK, DATA */
+				/* CLK */
 				pins = "gpio13";
 				function = "cam_mclk";
 			};
@@ -1703,7 +1716,7 @@
 		cam_sensor_mclk1_active: cam_sensor_mclk1_active {
 			/* MCLK1 */
 			mux {
-				/* CLK, DATA */
+				/* CLK */
 				pins = "gpio14";
 				function = "cam_mclk";
 			};
@@ -1718,7 +1731,7 @@
 		cam_sensor_mclk1_suspend: cam_sensor_mclk1_suspend {
 			/* MCLK1 */
 			mux {
-				/* CLK, DATA */
+				/* CLK */
 				pins = "gpio14";
 				function = "cam_mclk";
 			};
@@ -1866,7 +1879,7 @@
 		cam_sensor_mclk2_active: cam_sensor_mclk2_active {
 			/* MCLK1 */
 			mux {
-				/* CLK, DATA */
+				/* CLK */
 				pins = "gpio15";
 				function = "cam_mclk";
 			};
@@ -1881,7 +1894,7 @@
 		cam_sensor_mclk2_suspend: cam_sensor_mclk2_suspend {
 			/* MCLK1 */
 			mux {
-				/* CLK, DATA */
+				/* CLK */
 				pins = "gpio15";
 				function = "cam_mclk";
 			};
@@ -2428,16 +2441,28 @@
 		led_enable: led_enable {
 			mux {
 				pins = "gpio21";
-				drive_strength = <16>;
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio21";
+				drive_strength = <2>;
 				output-high;
+				bias-disable;
 			};
 		};
 
 		led_disable: led_disable {
 			mux {
 				pins = "gpio21";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio21";
 				drive_strength = <2>;
 				output-low;
+				bias-disable;
 			};
 		};
 

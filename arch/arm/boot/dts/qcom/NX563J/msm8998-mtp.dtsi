@@ -264,7 +264,7 @@
 		vdd_lcd-supply = <&pm8998_l14>;
 		vdd_ana-supply = <&pm8998_l28>;
 		vcc_i2c-supply = <&pm8998_l6>;
-		synaptics,tp-recovery-enable = <1>;
+		//synaptics,tp-recovery-enable = <1>; - test
 		synaptics,lcd-reg-name = "vdd_lcd";
 		synaptics,pwr-reg-name = "vdd_ana";
 		synaptics,bus-reg-name = "vcc_i2c";
@@ -278,6 +278,11 @@
 		synaptics,reset-on-state = <0>;
 		synaptics,reset-active-ms = <20>;
 		synaptics,reset-delay-ms = <20>;
+
+		synaptics,button_test_flag = <0> ;
+		synaptics,factory_up_cap = <3100> ;
+		synaptics,factory_low_cap = <1500> ;
+
 		//synaptics,lcd-reset-gpio = <&tlmm 94 0x0>;
 		synaptics,cap-button-codes = <172 139 158>;
 		synaptics,ub-i2c-addr = <0x20>;

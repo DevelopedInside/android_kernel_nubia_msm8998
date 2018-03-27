@@ -92,7 +92,6 @@
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_actuator_vaf_active>;
 		pinctrl-1 = <&cam_actuator_vaf_suspend>;
-		status = "disabled";
 	};
 
 	eeprom0: qcom,eeprom@0 {
