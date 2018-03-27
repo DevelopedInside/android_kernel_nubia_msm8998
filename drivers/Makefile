@@ -185,3 +185,6 @@ obj-$(CONFIG_BIF)		+= bif/
 
 obj-$(CONFIG_SENSORS_SSC)	+= sensors/
 obj-$(CONFIG_ESOC)              += esoc/
+# DTS_EAGLE START
+obj-$(CONFIG_DTS_EAGLE)                           += dts_eagle/
+# DTS_EAGLE END
