@@ -399,6 +399,9 @@ struct qpnp_hap {
 	bool				sup_brake_pat;
 	bool				correct_lra_drive_freq;
 	bool				perform_lra_auto_resonance_search;
+#ifdef CONFIG_FEATURE_ZTEMT_HAPTIC_VIBRATOR
+	u32					ztemt_vibrator_ms;
+#endif
 	bool				auto_mode;
 	bool				override_auto_mode_config;
 	bool				play_irq_en;
@@ -2233,12 +2236,6 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int time_ms)
 					 timed_dev);
 	int rc;
 
-	if (time_ms <= 0)
-		return;
-
-	if (time_ms < 10)
-		time_ms = 10;
-
 	mutex_lock(&hap->lock);
 	if (is_sw_lra_auto_resonance_control(hap))
 		hrtimer_cancel(&hap->auto_res_err_poll_timer);
@@ -2252,14 +2249,21 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int time_ms)
 			mutex_unlock(&hap->lock);
 			return;
 		}
+		hap->state = 0;
+	} else {
+#ifdef CONFIG_FEATURE_ZTEMT_HAPTIC_VIBRATOR
+	if(0 != time_ms)
+	{
+		time_ms = time_ms +hap->ztemt_vibrator_ms;
 	}
-
+#endif
 	time_ms = (time_ms > hap->timeout_ms ? hap->timeout_ms : time_ms);
 	hap->play_time_ms = time_ms;
 	hap->state = 1;
 	hrtimer_start(&hap->hap_timer,
 		ktime_set(time_ms / 1000, (time_ms % 1000) * 1000000),
 		HRTIMER_MODE_REL);
+	}
 	mutex_unlock(&hap->lock);
 	schedule_work(&hap->work);
 }
@@ -2653,6 +2657,17 @@ static int qpnp_hap_parse_dt(struct qpnp_hap *hap)
 		return rc;
 	}
 
+#ifdef CONFIG_FEATURE_ZTEMT_HAPTIC_VIBRATOR
+	hap->ztemt_vibrator_ms = 0;
+	rc = of_property_read_u32(pdev->dev.of_node,
+		"qcom,ztemt_vibrator_ms",&temp);
+	if (!rc) {
+		hap->ztemt_vibrator_ms = temp;
+	} else if (rc != -EINVAL) {
+		dev_err(&pdev->dev, "Unable to read ztemt_vibrator_ms\n");
+		return rc;
+	}
+#endif
 	hap->act_type = QPNP_HAP_LRA;
 	rc = of_property_read_string(pdev->dev.of_node,
 			"qcom,actuator-type", &temp_str);
