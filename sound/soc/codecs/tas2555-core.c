@@ -415,6 +415,43 @@ int tas2555_load_platdata(struct tas2555_priv *pTAS2555)
 int tas2555_load_default(struct tas2555_priv *pTAS2555)
 {
 	int nResult = 0;
+	unsigned int n;
+
+	//added by nubia, begin
+	nResult = pTAS2555->read(pTAS2555, TAS2555_RECOVER_REG, &n);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "read RECOVER1 failed\n");
+	} else
+		dev_info(pTAS2555->dev, "read RECOVER1: 0x%02x\n", n);
+
+	nResult = pTAS2555->write(pTAS2555, TAS2555_RECOVER_REG, 0x23);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "write RECOVER failed\n");
+	}
+
+	nResult = pTAS2555->read(pTAS2555, TAS2555_RECOVER_REG, &n);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "read RECOVER2 failed\n");
+	} else
+		dev_info(pTAS2555->dev, "read RECOVER2: 0x%02x\n", n);
+
+	nResult = pTAS2555->read(pTAS2555, TAS2555_GLITCH_REG, &n);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "read GLITCH1 failed\n");
+	} else
+		dev_info(pTAS2555->dev, "read GLITCH1: 0x%02x\n", n);
+
+	nResult = pTAS2555->write(pTAS2555, TAS2555_GLITCH_REG, 0x27);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "write GLITCH failed\n");
+	}
+
+	nResult = pTAS2555->read(pTAS2555, TAS2555_GLITCH_REG, &n);
+	if (nResult < 0) {
+		dev_err(pTAS2555->dev, "read GLITCH2 failed\n");
+	} else
+		dev_info(pTAS2555->dev, "read GLITCH2: 0x%02x\n", n);
+	//added by nubia, end
 
 	nResult = tas2555_dev_load_data(pTAS2555, p_tas2555_default_data);
 	if (nResult >= 0)

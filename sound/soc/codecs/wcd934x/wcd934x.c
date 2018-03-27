@@ -9225,7 +9225,7 @@ static int tavil_soc_codec_probe(struct snd_soc_codec *codec)
 
 	control = dev_get_drvdata(codec->dev->parent);
 
-	dev_info(codec->dev, "%s()\n", __func__);
+	dev_err(codec->dev, "enter %s()\n", __func__);
 	tavil = snd_soc_codec_get_drvdata(codec);
 	tavil->intf_type = wcd9xxx_get_intf_type();
 
@@ -9369,6 +9369,7 @@ static int tavil_soc_codec_probe(struct snd_soc_codec *codec)
 	 * can be released allowing the codec to go to SVS2.
 	 */
 	tavil_vote_svs(tavil, false);
+	dev_err(codec->dev, "exit %s()\n", __func__);
 
 	return ret;
 
@@ -9952,6 +9953,7 @@ static int tavil_probe(struct platform_device *pdev)
 	struct wcd9xxx_resmgr_v2 *resmgr;
 	struct wcd9xxx_power_region *cdc_pwr;
 
+	dev_err(&pdev->dev, "enter %s\n", __func__);
 	tavil = devm_kzalloc(&pdev->dev, sizeof(struct tavil_priv),
 			    GFP_KERNEL);
 	if (!tavil)
@@ -10045,7 +10047,7 @@ static int tavil_probe(struct platform_device *pdev)
 		goto err_cdc_reg;
 	}
 	schedule_work(&tavil->tavil_add_child_devices_work);
-
+	dev_err(&pdev->dev, "exit %s\n", __func__);
 	return ret;
 
 err_cdc_reg:

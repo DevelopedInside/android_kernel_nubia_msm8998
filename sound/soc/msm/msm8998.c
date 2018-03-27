@@ -3910,6 +3910,16 @@ static void *def_tavil_mbhc_cal(void)
 	btn_high = ((void *)&btn_cfg->_v_btn_low) +
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
+#ifdef CONFIG_ZTEMT_AUDIO
+	btn_high[0] = 110;
+	btn_high[1] = 240;
+	btn_high[2] = 437;
+	btn_high[3] = 437;
+	btn_high[4] = 437;
+	btn_high[5] = 437;
+	btn_high[6] = 437;
+	btn_high[7] = 437;
+#else
 	btn_high[0] = 75;
 	btn_high[1] = 150;
 	btn_high[2] = 237;
@@ -3918,6 +3928,7 @@ static void *def_tavil_mbhc_cal(void)
 	btn_high[5] = 500;
 	btn_high[6] = 500;
 	btn_high[7] = 500;
+#endif
 
 	return tavil_wcd_cal;
 }
@@ -6660,6 +6671,7 @@ static int msm_snd_card_tavil_late_probe(struct snd_soc_card *card)
 	int ret = 0;
 	void *mbhc_calibration;
 
+	dev_err(card->dev, "enter %s\n", __func__);
 	rtd = snd_soc_get_pcm_runtime(card, be_dl_name);
 	if (!rtd) {
 		dev_err(card->dev,
@@ -6681,6 +6693,7 @@ static int msm_snd_card_tavil_late_probe(struct snd_soc_card *card)
 			__func__, ret);
 		goto err_hs_detect;
 	}
+	dev_err(card->dev, "exit %s\n", __func__);
 	return 0;
 
 err_hs_detect:
@@ -7402,6 +7415,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	const struct of_device_id *match;
 	int ret;
 
+	dev_err(&pdev->dev, "enter %s\n",__func__);
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "No platform supplied from device tree\n");
 		return -EINVAL;
@@ -7592,6 +7606,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("%s: Audio notifier register failed ret = %d\n",
 			__func__, ret);
 
+	dev_err(&pdev->dev, "exit %s\n",__func__);
 	return 0;
 err:
 	if (pdata->us_euro_gpio > 0) {
