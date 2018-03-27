@@ -935,10 +935,18 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 		break;
 	}
 #ifdef CONFIG_NUBIA_LCD_DISP_PREFERENCE
+	//bypass nubia_disp_preference when power on first set backlight
 	if(last_level == -1){
-		last_level = bl_level;
+		last_level = 0;
 		return;
 	}
+	// bypass cmd for befor bl on
+	if(bl_level > 0)
+		pdata->panel_info.panel_ready_for_cmd = 1;
+	else
+		pdata->panel_info.panel_ready_for_cmd = 0;
+	// 1.when  power on second set backlight
+	// 2.press power key wake or suspend
 	if(last_level == 0 || bl_level == 0){
 		pr_info("%s: set bl level: %d\n", __func__,bl_level);
 		last_level = bl_level;
@@ -992,9 +1000,6 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	mdss_dsi_panel_apply_display_setting(pdata, pinfo->persist_mode);
 
 end:
-#ifdef CONFIG_NUBIA_LCD_DISP_PREFERENCE
-	pinfo->panel_ready_for_cmd = 1;
-#endif
 	pr_debug("%s:-\n", __func__);
 	return ret;
 }
@@ -1051,9 +1056,6 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 	pinfo = &pdata->panel_info;
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-#ifdef CONFIG_NUBIA_LCD_DISP_PREFERENCE
-	pinfo->panel_ready_for_cmd = 0;
-#endif
 	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	if (pinfo->dcs_cmd_by_left) {
@@ -3132,7 +3134,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
 
 #ifdef CONFIG_NUBIA_LCD_DISP_PREFERENCE
-	pinfo->panel_ready_for_cmd = 1;
 	nubia_set_dsi_ctrl(ctrl_pdata);
 #endif
 	return 0;

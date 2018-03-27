@@ -786,7 +786,6 @@ static ssize_t cabc_store(struct kobject *kobj,
         NUBIA_DISP_INFO("cabc value = %d\n", val);
 
         if(!boot_flag){
-		nubia_disp_val.cabc = val;
                 return size;
 	}
 
@@ -871,7 +870,6 @@ static ssize_t saturation_store(struct kobject *kobj,
 	NUBIA_DISP_INFO("saturation value = %d\n", val);
 
 	if(!boot_flag){
-		nubia_disp_val.saturation = val;
 		return size;
 	}
 
@@ -1202,11 +1200,15 @@ EXPORT_SYMBOL(nubia_set_dsi_ctrl);
 void nubia_disp_preference(void)
 {
 	int ret = 0;
-	NUBIA_DISP_ERROR("nubia_disp_preference start\n");
+	NUBIA_DISP_INFO("nubia_disp_preference start\n");
 
 	ret = nubia_set_saturation(nubia_disp_val.saturation);
+	ret = nubia_set_cabc(nubia_disp_val.cabc);
+	ret = nubia_set_ce_cabc(nubia_disp_val.saturation,nubia_disp_val.cabc);
+
 	if (ret == 0)
-		NUBIA_DISP_INFO("success to set saturation as = %d\n", nubia_disp_val.saturation);
+		NUBIA_DISP_INFO("success to set saturation  = %d , success to set cabc  = %d\n", nubia_disp_val.saturation,nubia_disp_val.cabc);
+
 	if (!boot_flag){
 		boot_flag = 1;
 		if(nubia_mdss_dsi_ctrl->nubia_mdp_colortmp_warm.defult == 0){
@@ -1251,7 +1253,7 @@ static int __init nubia_disp_preference_init(void)
 		}
 	}
 
-	NUBIA_DISP_ERROR("success\n");
+	NUBIA_DISP_INFO("success\n");
 
 	return retval;
 

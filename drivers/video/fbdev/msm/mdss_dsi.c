@@ -26,10 +26,10 @@
 #include <linux/uaccess.h>
 #include <linux/msm-bus.h>
 #include <linux/pm_qos.h>
-#include <linux/dma-buf.h>
 #ifdef CONFIG_NUBIA_LCD_KEEP_POWER_ON
 #include <linux/reboot.h>
 #endif
+#include <linux/dma-buf.h>
 
 #include "mdss.h"
 #include "mdss_panel.h"
@@ -3599,11 +3599,11 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	else
 		ctrl_pdata->shared_data->dsi1_active = true;
 
-	mdss_dsi_debug_bus_init(mdss_dsi_res);
-
 #ifdef CONFIG_NUBIA_LCD_KEEP_POWER_ON
 	register_reboot_notifier(&incell_lcd_reboot_nb);
 #endif
+	mdss_dsi_debug_bus_init(mdss_dsi_res);
+
 	return 0;
 
 error_shadow_clk_deinit:
