@@ -313,11 +313,6 @@ static int mark_special_uuid(unsigned int hook,struct sk_buff *skb)
         else if(MULTI_MARKED == ret1){
             ret = MULTI_MARKED;
         }
-
-        if( uuid == 1000){
-            skb->mark = 0x0 & 0xFFFF;
-            ret = MULTI_MARKED;
-        }
     }
 
     return ret;
@@ -349,7 +344,7 @@ static int is_dns_skb(struct sk_buff *skb){
     return 0;
 }
 
-static int is_valid_uuid(unsigned int hook,struct sk_buff *skb)
+static int is_valid_uuid(unsigned int hook,struct sk_buff *skb,struct nf_conn *ct)
 {
     struct file *filp;
     unsigned int uuid;
@@ -361,12 +356,19 @@ static int is_valid_uuid(unsigned int hook,struct sk_buff *skb)
         skb->sk->sk_socket->file != NULL){
 
         filp = skb->sk->sk_socket->file;
-	if(NULL != filp->f_cred){
+	      if(NULL != filp->f_cred){
 
            uuid = filp->f_cred->fsuid.val;
+
+           if( uuid == 1000){
+              skb->mark = 0x0100 & 0xFFFF;
+              ct->mark = skb->mark;
+              return IS_INVALID;
+           }
+
            multi_read_lock();
            for(i = 0; i < multi_valid_uuid.count; i++){
-               if(uuid == multi_valid_uuid.uid[i]){
+               if(uuid && uuid == multi_valid_uuid.uid[i]){
                    multi_read_unlock();
                    return IS_VALID;
                }
@@ -463,7 +465,7 @@ static unsigned int multi_channel_hook(void *priv,
             goto DNS_MARK;
         }
 
-        if(IS_VALID == is_valid_uuid(hook,skb)){
+        if(IS_VALID == is_valid_uuid(hook,skb,ct)){
             if(MULTI_ACEEPT == mark_retransmit_skb(hook,ct,skb)){
                 ret = mark_special_uuid(hook,skb);
                 if(MULTI_ACEEPT == ret){
@@ -472,7 +474,7 @@ static unsigned int multi_channel_hook(void *priv,
                     if((prandom_u32() & 0x7FFFFFFF) < (0x147ae14 * multi_weight[0])){
                         skb->mark = 0x0100 & 0xFFFF;
                     }
-		    else if((prandom_u32() & 0x7FFFFFFF) < (0x147ae14 * multi_weight[2])){
+		                else if((prandom_u32() & 0x7FFFFFFF) < (0x147ae14 * multi_weight[2])){
                         skb->mark = 0x0300 & 0xFFFF;
                     }
                     else if((prandom_u32() & 0x7FFFFFFF) < (0x147ae14 * multi_weight[1])){

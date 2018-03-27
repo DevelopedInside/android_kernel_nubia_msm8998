@@ -994,7 +994,6 @@ static struct clk_ops clk_ops_bitclk_src_c;
 static struct clk_ops clk_ops_post_vco_div_c;
 static struct clk_ops clk_ops_post_bit_div_c;
 static struct clk_ops clk_ops_pclk_src_c;
-static struct clk_ops clk_ops_pll_out_div_c;
 
 static struct clk_div_ops clk_post_vco_div_ops = {
 	.set_div = post_vco_clk_set_div,
@@ -1014,11 +1013,6 @@ static struct clk_div_ops pixel_clk_div_ops = {
 static struct clk_div_ops clk_bitclk_src_ops = {
 	.set_div = bit_clk_set_div,
 	.get_div = bit_clk_get_div,
-};
-
-static struct clk_div_ops clk_pll_out_div_ops = {
-	.set_div = pll_out_clk_set_div,
-	.get_div = pll_out_clk_get_div,
 };
 
 static struct clk_ops clk_ops_vco_8998 = {
@@ -1665,9 +1659,6 @@ int dsi_pll_clock_register_8998(struct platform_device *pdev,
 
 	clk_ops_bitclk_src_c = clk_ops_div;
 	clk_ops_bitclk_src_c.prepare = mdss_pll_div_prepare;
-
-	clk_ops_pll_out_div_c = clk_ops_div;
-	clk_ops_pll_out_div_c.prepare = mdss_pll_div_prepare;
 
 	/*
 	 * Set the ops for the two dividers in the pixel clock tree to the
