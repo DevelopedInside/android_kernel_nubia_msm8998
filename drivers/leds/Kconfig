@@ -632,6 +632,13 @@ config ZTEMT_BREATH_LEDS
 	help
 	  This option enables support for the ZTEMT RGB LED connected
 	  Say Y to enable support for the ZTEMT LED.
+
+config NUBIA_DOUBLE_LEDS
+	tristate "LED support for NUBIA DOUBLE LED"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the NUBIA DOUBLE LED connected
+	  Say Y to enable support for the NUBIA DOUBLE LED.
 # Nubia add end
 
 config LEDS_VERSATILE

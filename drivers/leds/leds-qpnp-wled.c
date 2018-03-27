@@ -1010,7 +1010,7 @@ static void qpnp_wled_work(struct work_struct *work)
 			}
 		}
         if (!!level) {
-            rc = regulator_set_voltage(bob_test, 3312000, 3600000); 
+            rc = regulator_set_voltage(bob_test, 3400000, 3600000); 
             rc = regulator_disable(bob_test); 
         } else {
             rc = regulator_set_voltage(bob_test, 3450000, 3600000); 

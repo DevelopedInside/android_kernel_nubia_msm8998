@@ -624,6 +624,11 @@ struct qpnp_led_data {
 	int ztemt_mode;
 	u8 debug_level;
 #endif
+
+#ifdef CONFIG_NUBIA_DOUBLE_LEDS
+	int hold_time_ms;
+	int off_time_ms;
+#endif
 };
 
 static DEFINE_MUTEX(flash_lock);
@@ -2761,6 +2766,71 @@ static ssize_t blink_store(struct device *dev,
 	}
 	return count;
 }
+
+#ifdef CONFIG_NUBIA_DOUBLE_LEDS
+static ssize_t qpnp_led_time_store(struct device *dev,
+	struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	ssize_t ret;
+	u32 previous_pause_hi;
+	u32 previous_pause_lo;
+	u32 previous_lut_flags;
+	struct pwm_config_data *pwm_cfg;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct qpnp_led_data *led = container_of(led_cdev, struct qpnp_led_data, cdev);
+
+	ret = sscanf(buf, "%d %d", &led->hold_time_ms, &led->off_time_ms);
+	pr_info("qpnp_led_time_store: hold_time_ms=%d, off_time_ms=%d\n", led->hold_time_ms, led->off_time_ms);
+
+	pwm_cfg = led->rgb_cfg->pwm_cfg;
+	if (pwm_cfg->mode == LPG_MODE)
+		pwm_cfg->blinking = true;
+
+	previous_pause_hi = pwm_cfg->lut_params.lut_pause_hi;
+	previous_pause_lo = pwm_cfg->lut_params.lut_pause_lo;
+	previous_lut_flags = pwm_cfg->lut_params.flags;
+	if (pwm_cfg->pwm_enabled) {
+		pwm_disable(pwm_cfg->pwm_dev);
+		pwm_cfg->pwm_enabled = 0;
+	}
+
+	pwm_cfg->lut_params.lut_pause_hi = led->hold_time_ms;
+	pwm_cfg->lut_params.lut_pause_lo = led->off_time_ms;
+	pwm_cfg->lut_params.flags = (PM_PWM_LUT_LOOP | PM_PWM_LUT_REVERSE |
+		PM_PWM_LUT_RAMP_UP | PM_PWM_LUT_PAUSE_LO_EN | PM_PWM_LUT_PAUSE_HI_EN);
+	ret = qpnp_pwm_init(pwm_cfg, led->pdev, led->cdev.name);
+	if (ret) {
+		pwm_cfg->lut_params.lut_pause_hi = previous_pause_hi;
+		pwm_cfg->lut_params.lut_pause_lo = previous_pause_lo;
+		pwm_cfg->lut_params.flags = previous_lut_flags;
+		if (pwm_cfg->pwm_enabled) {
+			pwm_disable(pwm_cfg->pwm_dev);
+			pwm_cfg->pwm_enabled = 0;
+		}
+		qpnp_pwm_init(pwm_cfg, led->pdev, led->cdev.name);
+		qpnp_led_set(&led->cdev, led->cdev.brightness);
+		dev_err(&led->pdev->dev,
+			"Failed to initialize pwm with new pause hi/lo/lut flags value\n");
+		return ret;
+	}
+	qpnp_led_set(&led->cdev, led->cdev.brightness);
+	pr_info("qpnp_led_time_store success.\n");
+
+	return count;
+}
+static ssize_t qpnp_led_time_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct qpnp_led_data *led;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	led = container_of(led_cdev, struct qpnp_led_data, cdev);
+
+	return snprintf(buf, PAGE_SIZE, "%d %d \n",
+		led->hold_time_ms, led->off_time_ms);
+}
+#endif
+
 #ifdef CONFIG_ZTEMT_BREATH_LEDS
 static int fade_parameter_convert(int temp_start)
 {
@@ -3117,6 +3187,10 @@ static DEVICE_ATTR(outn, 0664, outn_show, outn_store);
 static DEVICE_ATTR(debug, 0664, qpnp_led_debug_show, qpnp_led_debug_store);
 #endif
 
+#ifdef CONFIG_NUBIA_DOUBLE_LEDS
+static DEVICE_ATTR(delay, 0664, qpnp_led_time_show, qpnp_led_time_store);
+#endif
+
 static struct attribute *led_attrs[] = {
 	&dev_attr_led_mode.attr,
 	&dev_attr_strobe.attr,
@@ -3145,6 +3219,9 @@ static struct attribute *lpg_attrs[] = {
 	&dev_attr_grade_parameter.attr,
 	&dev_attr_outn.attr,
 	&dev_attr_debug.attr,
+#endif
+#ifdef CONFIG_NUBIA_DOUBLE_LEDS
+	&dev_attr_delay.attr,
 #endif
 	NULL
 };
