@@ -945,6 +945,15 @@ static int32_t msm_cci_i2c_read(struct v4l2_subdev *sd,
 		rc = 0;
 	}
 
+/*ZTEMT: fengxun add for ov5675 eeprom unlock bug--------Start*/
+#ifndef CONFIG_AL3200
+       if(c_ctrl->cci_info->is_cal_mode){
+            CDBG("%s  sleep 6us\n", __func__);
+            usleep_range(6000,6100);
+       }
+#endif
+/*ZTEMT: fengxun add for ov5675 eeprom unlock bug--------End*/
+
 	read_words = msm_camera_io_r_mb(cci_dev->base +
 		CCI_I2C_M0_READ_BUF_LEVEL_ADDR + master * 0x100);
 	exp_words = ((read_cfg->num_byte / 4) + 1);

@@ -26,6 +26,15 @@ DEFINE_MSM_MUTEX(msm_eeprom_mutex);
 static struct v4l2_file_operations msm_eeprom_v4l2_subdev_fops;
 #endif
 
+#ifndef CONFIG_AL3200
+#define BACK_CAL_DATA_FLAG           0x0B17
+#define BACK_CAL_DATA_END             0x1316
+#define BACK_CAL_DATA_CHECKSUM   0x1317
+#define FRONT_CAL_DATA_FLAG          0x0015
+#define FRONT_CAL_DATA_END            0x0814
+#define FRONT_CAL_DATA_CHECKSUM  0x15F0
+#endif
+
 /**
   * msm_get_read_mem_size - Get the total size for allocation
   * @eeprom_map_array:	mem map
@@ -614,6 +623,8 @@ static int eeprom_config_read_cal_data(struct msm_eeprom_ctrl_t *e_ctrl,
 }
 
 //ZTEMT:zhouruoyu add for factory altek 3D calibration ----- start
+#ifdef CONFIG_AL3200
+//for altek case
 static int write_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl, uint32_t size, uint8_t* buffer)
 {
 	int rc = 0;
@@ -692,6 +703,285 @@ static int write_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl, uint32_t size, 
 END:
 	return rc;
 }
+#else
+//for arcsoft case
+int32_t nubia_i2c_send_CSWP(struct msm_eeprom_ctrl_t *e_ctrl){
+    int32_t rc = -EFAULT;
+    pr_err("%s  ---E\n", __func__);
+    if((e_ctrl->i2c_client.cci_client->sid << 1)  == 0xA8){
+            usleep_range(3000, 3100);
+            e_ctrl->i2c_client.cci_client->retries = 0;
+            e_ctrl->i2c_client.cci_client->is_cal_mode = 1;
+            e_ctrl->i2c_client.cci_client->sid = 0x00 >> 1;
+            rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+                           &(e_ctrl->i2c_client),
+                           0,
+                           0,
+                           1);
+            if ( rc < 0) {
+                   pr_err("%s  send CSWP command error not fatal\n",__func__);
+            }else{
+                    pr_err("%s  send CSWP command OK\n",__func__);
+            }
+
+            e_ctrl->i2c_client.cci_client->sid = 0xA8 >> 1;
+            e_ctrl->i2c_client.cci_client->retries = 3;
+            usleep_range(3000, 3100);
+    }
+    pr_err("%s  ---X\n", __func__);
+    return rc;
+}
+int32_t nubia_i2c_write_seq(struct msm_eeprom_ctrl_t *e_ctrl, uint32_t addr, uint8_t *data, uint32_t num_byte)
+{
+    int32_t rc = -EFAULT;
+    int write_idx_pre = 0;
+    int write_num = 0;
+    int write_width = 32;
+    int i = 0;
+
+    pr_err("%s  ---E\n", __func__);
+    usleep_range(3000, 3100);
+    pr_err("%s  num_byte = %d\n", __func__, num_byte);
+
+    if(num_byte < 32){
+        pr_err("%s  num_byte is smaller than 32 ,error\n", __func__);
+        goto END;
+    }
+
+    write_idx_pre = addr % 32;
+    pr_err("%s  addr write_idx_pre = %d\n", __func__, write_idx_pre);
+
+    //i2c_write_seq
+    if(write_idx_pre != 0){
+        write_width = 32 - write_idx_pre;
+    }else{
+        write_width = 32;
+    }
+
+    for (i = 0; i < num_byte;)
+    {
+        if (num_byte - write_num < 32)
+        {
+            write_width = num_byte - write_num;
+        }
+        //pr_err("%s remain num = %d write_width = %d \n", __func__, num_byte - write_num,write_width);
+        rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
+                    &(e_ctrl->i2c_client),
+                    addr + i,
+                    data + i,
+                    write_width);
+        if ( rc < 0)
+        {
+            pr_err("%s nubia_i2c_write_seq error\n", __func__);
+            goto END;
+        }
+
+        write_num += write_width;
+         i += write_width;
+        write_width = 32;
+
+        usleep_range(3000, 3100);
+    }
+
+    pr_err("%s  total write num = %d\n", __func__, write_num);
+
+END:
+    pr_err("%s  ---X\n", __func__);
+    return rc;
+}
+static int write_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl, uint32_t size, uint8_t* buffer)
+{
+        int rc = 0;
+        uint32_t i = 0;
+        uint8_t *buffer_read = NULL;
+        int check_sum = 0;
+
+        int cal_data_start = 0;
+        int cal_data_end = 0;
+        int cal_data_checksum = 0;
+
+        uint8_t *total_buffer_read = NULL;
+
+        if (!e_ctrl) {
+            pr_err("%s e_ctrl is NULL", __func__);
+            return -EINVAL;
+        }
+        if (!e_ctrl->i2c_client.cci_client){
+            pr_err("%s cci_client is NULL", __func__);
+            return -EINVAL;
+        }
+
+        pr_err("%s  ---E\n",__func__);
+        pr_err("%s salve addr = %x", __func__,e_ctrl->i2c_client.cci_client->sid<<1);
+        if((e_ctrl->i2c_client.cci_client->sid << 1)  == 0xA0){
+            cal_data_start = BACK_CAL_DATA_FLAG;
+            cal_data_end = BACK_CAL_DATA_END;
+            cal_data_checksum = BACK_CAL_DATA_CHECKSUM;
+            pr_err("%s write [back sensor] start=0x%x end=0x%x checksum=0x%x size=%d", __func__,
+                cal_data_start,cal_data_end,cal_data_checksum,size);
+        }else if((e_ctrl->i2c_client.cci_client->sid << 1)  == 0xA8){
+            cal_data_start = FRONT_CAL_DATA_FLAG;
+            cal_data_end = FRONT_CAL_DATA_END;
+            cal_data_checksum = FRONT_CAL_DATA_CHECKSUM;
+            pr_err("%s write [front sensor] start=0x%x end=0x%x checksum=0x%x size=%d", __func__,
+                cal_data_start,cal_data_end,cal_data_checksum,size);
+        }else{
+            pr_err("%s  sid error",__func__);
+            return -EINVAL;
+        }
+
+        msleep(500);//ZTEMT: li.bin223 add for improve write eeprom
+        nubia_i2c_send_CSWP(e_ctrl);
+        msleep(100);
+       rc = nubia_i2c_write_seq(e_ctrl, cal_data_start, buffer, size);
+
+       for (i = 0; i < size; i++) {
+               check_sum += buffer[i];
+       }
+       usleep_range(3000,3100);
+
+
+       if ( rc < 0) {
+               goto END;
+       }else{
+               pr_err("%s  i2c_write done",__func__);
+       }
+
+       //check data
+       buffer_read = kzalloc(sizeof(uint8_t) * (size), GFP_KERNEL);
+       if (!buffer_read) {
+               pr_err("%s:%d kzalloc failed\n", __func__, __LINE__);
+               return -ENOMEM;
+       }
+
+       rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
+                               &(e_ctrl->i2c_client),
+                               cal_data_start,
+                               buffer_read,
+                               size);
+       if ( rc < 0) {
+               pr_err("%s %d i2c_read_seq error",__func__,__LINE__);
+               kfree(buffer_read);
+               goto END;
+       }
+
+       //check sum
+       check_sum %= 256;
+       rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+                       &(e_ctrl->i2c_client),
+                       cal_data_checksum,
+                       check_sum,
+                       1);
+
+       for (i = 0; i < size ; i++) {
+               if (buffer[i] != buffer_read[i]) {
+                       pr_err("%s data error, addr=0x%X, write data =0x%X, read data=0x%X",
+                               __func__, i, buffer[i], buffer_read[i]);
+                       rc = -EINVAL;
+                       kfree(buffer_read);
+                       goto END;
+               }
+       }
+
+       //total check sum
+        usleep_range(3000,3100);
+        check_sum = 0;
+
+       total_buffer_read = kzalloc(sizeof(uint8_t) * (5615), GFP_KERNEL);
+       if (!total_buffer_read) {
+               pr_err("%s:%d kzalloc failed\n", __func__, __LINE__);
+               kfree(buffer_read);
+               return -ENOMEM;
+       }
+
+        if((e_ctrl->i2c_client.cci_client->sid << 1)  == 0xA0){
+           rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
+                                   &(e_ctrl->i2c_client),
+                                   0,
+                                   total_buffer_read,
+                                   4888);
+           if ( rc < 0) {
+                   pr_err("%s  %d i2c_read_seq error",__func__,__LINE__);
+                   kfree(total_buffer_read);
+                   kfree(buffer_read);
+                   goto END;
+           }
+
+        for (i = 0; i < 4888 ; i++) {
+            check_sum += total_buffer_read[i];
+        }
+        pr_err("%s  new total checksum is 0x%x ",__func__,check_sum);
+        check_sum= check_sum & 0xFFFF;
+
+        usleep_range(3000,3100);
+        rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+                       &(e_ctrl->i2c_client),
+                       4888,
+                       check_sum>>8,
+                       1);
+        if ( rc < 0) {
+               pr_err("%s  i2c_write error",__func__);
+               kfree(total_buffer_read);
+               kfree(buffer_read);
+               goto END;
+        }
+
+        usleep_range(3000,3100);
+        rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+                       &(e_ctrl->i2c_client),
+                       4889,
+                       check_sum&0xff,
+                       1);
+        if ( rc < 0) {
+               pr_err("%s  i2c_write error",__func__);
+               kfree(total_buffer_read);
+               kfree(buffer_read);
+               goto END;
+        }
+
+        }else if((e_ctrl->i2c_client.cci_client->sid << 1)  == 0xA8){
+           rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
+                                   &(e_ctrl->i2c_client),
+                                   0,
+                                   total_buffer_read,
+                                   5615);
+           if ( rc < 0) {
+                   pr_err("%s  %d i2c_read_seq error",__func__,__LINE__);
+                   kfree(total_buffer_read);
+                   kfree(buffer_read);
+                   goto END;
+           }
+
+        for (i = 0; i < 5615 ; i++) {
+            check_sum += total_buffer_read[i];
+        }
+
+        check_sum= check_sum%256;
+        pr_err("%s  new total checksum is 0x%x ",__func__,check_sum);
+
+        usleep_range(3000,3100);
+        rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+                       &(e_ctrl->i2c_client),
+                       0x15F2,
+                       check_sum,
+                       1);
+        if ( rc < 0) {
+               pr_err("%s  i2c_write error",__func__);
+               kfree(total_buffer_read);
+               kfree(buffer_read);
+               goto END;
+        }
+
+        }
+        
+       kfree(total_buffer_read);
+       kfree(buffer_read);
+END:
+       e_ctrl->i2c_client.cci_client->is_cal_mode = 0;
+       pr_err("%s  ---X\n",__func__);
+       return rc;
+}
+#endif
 //ZTEMT:zhouruoyu add for factory altek 3D calibration ----- end
 
 static int msm_eeprom_config(struct msm_eeprom_ctrl_t *e_ctrl,
@@ -761,7 +1051,7 @@ static int msm_eeprom_config(struct msm_eeprom_ctrl_t *e_ctrl,
 		break;
 	//ZTEMT:zhouruoyu add for factory altek 3D calibration ----- start
 	case CFG_EEPROM_DO_CALIBRATION:
-		CDBG("%s E CFG_EEPROM_READ_CAL_DATA\n", __func__);
+		pr_err("%s E CFG_EEPROM_READ_CAL_DATA\n", __func__);
 		size = cdata->cfg.write_data.num_bytes;
 		buffer = kzalloc(size * (sizeof(uint8_t)), GFP_KERNEL);
 		if (!buffer) {

@@ -18,7 +18,7 @@
 #include "msm_isp48.h"
 
 #define HANDLE_TO_IDX(handle) (handle & 0xFF)
-#define ISP_SOF_DEBUG_COUNT 0
+#define ISP_SOF_DEBUG_COUNT 0//ZTEMT: li.bin1 change it according to NX551J
 
 static void msm_isp_reload_ping_pong_offset(
 		struct msm_vfe_axi_stream *stream_info);

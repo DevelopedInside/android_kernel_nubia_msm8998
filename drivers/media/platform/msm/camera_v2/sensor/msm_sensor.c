@@ -45,10 +45,12 @@ extern int g_isMiniISP_Probled;
 //int g_isMiniISP_read = 0;
 //int g_isMiniISP_Resolution = 0;
 //static struct isp_cmd_tx_info stream_on_off[SENSOR_TYPEMAX];
-int imx362_state = MSM_SENSOR_POWER_DOWN;
-int imx318_state = MSM_SENSOR_POWER_DOWN;
 int retry = 3;
 #endif
+int imx362_state = MSM_SENSOR_POWER_DOWN;
+int imx318_state = MSM_SENSOR_POWER_DOWN;
+int ov5675_main_state = MSM_SENSOR_POWER_DOWN;
+int ov5675_aux_state = MSM_SENSOR_POWER_DOWN;
 /*ZTEMT: fengxun add for AL3200--------End*/
 
 static struct msm_camera_i2c_fn_t msm_sensor_cci_func_tbl;
@@ -874,16 +876,22 @@ static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 			}
 			s_ctrl->sensor_state = MSM_SENSOR_POWER_UP;
 /*ZTEMT: fengxun add for AL3200--------Start*/
-#ifdef CONFIG_AL3200
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx362")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx362",6)==0){
 				pr_err("%s:%d imx362_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx362_state = s_ctrl->sensor_state;
 			}
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx318")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx318",6)==0){
 				pr_err("%s:%d imx318_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx318_state = s_ctrl->sensor_state;
 			}
-#endif
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_main")==0) {
+				pr_err("%s:%d ov5675_main_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_main_state = s_ctrl->sensor_state;
+			}
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_aux")==0) {
+				pr_err("%s:%d ov5675_aux_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_aux_state = s_ctrl->sensor_state;
+			}
 /*ZTEMT: fengxun add for AL3200--------End*/
 			CDBG("%s:%d sensor state %d\n", __func__, __LINE__,
 				s_ctrl->sensor_state);
@@ -915,27 +923,39 @@ static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 			}
 			s_ctrl->sensor_state = MSM_SENSOR_POWER_DOWN;
 /*ZTEMT: fengxun add for AL3200--------Start*/
-#ifdef CONFIG_AL3200
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx362")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx362", 6)==0){
 				pr_err("%s:%d imx362_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx362_state = s_ctrl->sensor_state;
+			  #ifdef CONFIG_AL3200
                             if((imx362_state==MSM_SENSOR_POWER_DOWN)&&(imx318_state==MSM_SENSOR_POWER_DOWN)){
                                     if(g_isMiniISP_Probled == 1){
                                             mini_isp_poweroff();
                                     }
                             }
-                    }
+			  #endif
+			}
 
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx318")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx318", 6)==0){
 				pr_err("%s:%d imx318_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx318_state = s_ctrl->sensor_state;
+			  #ifdef CONFIG_AL3200
                             if((imx362_state==MSM_SENSOR_POWER_DOWN)&&(imx318_state==MSM_SENSOR_POWER_DOWN)){
                                     if(g_isMiniISP_Probled == 1){
                                             mini_isp_poweroff();
                                     }
                             }
+			  #endif
 			}
-#endif
+
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_main")==0){
+				pr_err("%s:%d ov5675_main= %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_main_state = s_ctrl->sensor_state;
+			}
+
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_aux")==0){
+				pr_err("%s:%d ov5675_aux= %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_aux_state = s_ctrl->sensor_state;
+			}
 /*ZTEMT: fengxun add for AL3200--------End*/
 			CDBG("%s:%d sensor state %d\n", __func__, __LINE__,
 				s_ctrl->sensor_state);
@@ -1466,16 +1486,22 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			}
 			s_ctrl->sensor_state = MSM_SENSOR_POWER_UP;
 /*ZTEMT: fengxun add for AL3200--------Start*/
-#ifdef CONFIG_AL3200
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx362")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx362",6)==0){
 				pr_err("%s:%d imx362_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx362_state = s_ctrl->sensor_state;
 			}
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx318")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx318",6)==0){
 				pr_err("%s:%d imx318_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx318_state = s_ctrl->sensor_state;
 			}
-#endif
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_main")==0){
+				pr_err("%s:%d ov5675_main_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_main_state = s_ctrl->sensor_state;
+			}
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_aux")==0){
+				pr_err("%s:%d ov5675_aux_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_aux_state = s_ctrl->sensor_state;
+			}
 /*ZTEMT: fengxun add for AL3200--------End*/
 			CDBG("%s:%d sensor state %d\n", __func__, __LINE__,
 				s_ctrl->sensor_state);
@@ -1508,26 +1534,36 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			}
 			s_ctrl->sensor_state = MSM_SENSOR_POWER_DOWN;
 /*ZTEMT: fengxun add for AL3200--------Start*/
-#ifdef CONFIG_AL3200
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx362")==0){
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx362", 6)==0){
 				pr_err("%s:%d imx362_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx362_state = s_ctrl->sensor_state;
+			  #ifdef CONFIG_AL3200
                             if((imx362_state==MSM_SENSOR_POWER_DOWN)&&(imx318_state==MSM_SENSOR_POWER_DOWN)){
                                     if(g_isMiniISP_Probled == 1){
                                             mini_isp_poweroff();
                                     }
                             }
-                    }
-			if(strcmp(s_ctrl->sensordata->sensor_name,"imx318")==0){
+			  #endif
+			}
+			if(strncmp(s_ctrl->sensordata->sensor_name,"imx318", 6)==0){
 				pr_err("%s:%d imx318_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
 				imx318_state = s_ctrl->sensor_state;
+			  #ifdef CONFIG_AL3200
                             if((imx362_state==MSM_SENSOR_POWER_DOWN)&&(imx318_state==MSM_SENSOR_POWER_DOWN)){
                                     if(g_isMiniISP_Probled == 1){
                                             mini_isp_poweroff();
                                     }
                             }
+			  #endif
 			}
-#endif
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_main")==0) {
+				pr_err("%s:%d ov5675_main_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_main_state = s_ctrl->sensor_state;
+			}
+			if(strcmp(s_ctrl->sensordata->sensor_name,"ov5675_aux")==0) {
+				pr_err("%s:%d ov5675_aux_state = %d\n", __func__,__LINE__, s_ctrl->sensor_state);
+				ov5675_aux_state = s_ctrl->sensor_state;
+			}
 /*ZTEMT: fengxun add for AL3200--------End*/
 			CDBG("%s:%d sensor state %d\n", __func__, __LINE__,
 				s_ctrl->sensor_state);
