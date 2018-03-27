@@ -1219,6 +1219,7 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 		struct synaptics_rmi4_fn *fhandler)
 {
 	int retval;
+	int ii = 0;
 	unsigned char touch_count = 0; /* number of touch points */
 	unsigned char reg_index;
 	unsigned char finger;
@@ -1407,6 +1408,10 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				BTN_TOUCH, 0);
 		input_report_key(rmi4_data->input_dev,
 				BTN_TOOL_FINGER, 0);
+		for(ii=0; ii< rmi4_data->num_of_fingers; ii++){
+			input_mt_slot(rmi4_data->input_dev, ii);
+			input_mt_report_slot_state(rmi4_data->input_dev, MT_TOOL_FINGER, 0);
+                }
 #ifndef TYPE_B_PROTOCOL
 		input_mt_sync(rmi4_data->input_dev);
 #endif
@@ -1437,6 +1442,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	int wx;
 	int wy;
 	int temp;
+	int ii = 0;
 #ifdef REPORT_2D_PRESSURE
 	int pressure;
 #endif
@@ -1737,6 +1743,12 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				BTN_TOUCH, 0);
 		input_report_key(rmi4_data->input_dev,
 				BTN_TOOL_FINGER, 0);
+		for(ii=0; ii< rmi4_data->num_of_fingers; ii++){
+			input_mt_slot(rmi4_data->input_dev, ii);
+			//pr_info("%s:ii=%d\n",__func__, ii);
+			input_mt_report_slot_state(rmi4_data->input_dev,
+				MT_TOOL_FINGER, 0);
+		}
 #ifndef TYPE_B_PROTOCOL
 		input_mt_sync(rmi4_data->input_dev);
 #endif
@@ -4379,6 +4391,39 @@ exit:
 }
 EXPORT_SYMBOL(synaptics_rmi4_new_function);
 
+static int synaptics_creat_tpnode(struct synaptics_rmi4_data * rmi4_data)
+{
+	struct class * tpnode_class;
+	struct device * tpnode_dev;
+	int retval = -1;
+
+	 tpnode_class = class_create(THIS_MODULE, "tpnode");
+	 if(IS_ERR(tpnode_class))
+	 {
+		pr_err("%s : Failed to create tpnode_class \n",__func__);
+		goto err;
+	 }
+
+	 tpnode_dev = device_create(tpnode_class, NULL, 0, NULL, "tpnode");
+	 if(IS_ERR(tpnode_dev))
+	 {
+		pr_err("%s : Failed to create tpnode_dev \n",__func__);
+		goto err;
+	 }
+
+	 retval = sysfs_create_link(&tpnode_dev->kobj, &rmi4_data->input_dev->dev.kobj,"synaptics");
+	 if(retval != 0 )
+	 {
+		pr_err("%s : Failed to create tpnode_link \n",__func__);
+		goto err;
+	 }
+	 return 0;
+err:
+	return retval;
+}
+
+
+
 static int synaptics_rmi4_probe(struct platform_device *pdev)
 {
 	int retval;
@@ -4573,7 +4618,12 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 		}
 	}
 
-
+	retval = synaptics_creat_tpnode(rmi4_data);
+	if(retval < 0)
+	{
+		dev_err(&pdev->dev,"%s: Failed to create tpnode \n",__func__);
+		goto err_sysfs;
+	}
 
 #ifdef NUBIA_TP_NODE_IN_KERNEL
 	nubia_tp = rmi4_data;

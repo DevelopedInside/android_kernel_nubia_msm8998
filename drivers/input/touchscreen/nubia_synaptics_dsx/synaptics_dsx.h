@@ -95,6 +95,9 @@ struct synaptics_dsx_board_data {
 	int reset_on_state;
 	int max_y_for_2d;
 	int lcd_reset_gpio;//nubia for incell screen
+	int button_test_flag;
+	int factory_up_cap;
+	int factory_low_cap;
 	unsigned long irq_flags;
 	unsigned short i2c_addr;
 	unsigned short ub_i2c_addr;

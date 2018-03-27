@@ -98,7 +98,31 @@ static int parse_dt(struct device *dev, struct synaptics_dsx_board_data *bdata)
 		return retval;
 	else
 		bdata->irq_flags = value;
-
+	retval = of_property_read_u32(np, "synaptics,button_test_flag", &value);
+	if (retval < 0)
+	{
+		bdata->button_test_flag=1;
+		return retval;
+	}
+	else
+		bdata->button_test_flag = value;
+	pr_err("[TP]%s: ssynaptics,button_test_flag = %d\n", __func__, bdata->button_test_flag);
+	 retval = of_property_read_u32(np, "synaptics,factory_up_cap", &value);
+        if (retval < 0)
+        {
+                bdata->factory_up_cap=2800;
+        }
+        else
+                bdata->factory_up_cap = value;
+        pr_err("[TP]%s: ssynaptics,factory_up_cap = %d\n", __func__, bdata->factory_up_cap);
+	 retval = of_property_read_u32(np, "synaptics,factory_low_cap", &value);
+        if (retval < 0)
+        {
+                bdata->factory_low_cap=1500;
+        }
+        else
+                bdata->factory_low_cap= value;
+        pr_err("[TP]%s: ssynaptics,factory_low_cap = %d\n", __func__, bdata->factory_low_cap);
 	retval = of_property_read_string(np, "synaptics,pwr-reg-name", &name);
 	if (retval == -EINVAL)
 		bdata->pwr_reg_name = NULL;

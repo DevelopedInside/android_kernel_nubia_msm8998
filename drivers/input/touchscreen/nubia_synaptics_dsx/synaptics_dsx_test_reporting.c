@@ -2799,8 +2799,6 @@ static ssize_t test_sysfs_ic_detect_show(struct device *dev,
 	int tx_num = f54->tx_assigned;
 	int rx_num = f54->rx_assigned;
 	short *report_data_16;
-	short low_cap = 1500; //min value, this will be reconfiged later
-	short up_cap = 2800; //max value, this will be reconfiged later
 	short max_cap = 0;
 	short min_cap = 9000;
 	int rx_vk = 3;
@@ -2814,18 +2812,17 @@ static ssize_t test_sysfs_ic_detect_show(struct device *dev,
 #endif
         unsigned char always_log = /* 1 */ 1;
         unsigned char test_key = 1;
-
 #define PBUF_LEN 1024
         char print_buf[PBUF_LEN];
         char *pb;
         int len, tlen;
 
         //key leveel
-        short key_1[2] = {5800, 6800};
-        short key_2[2] = {6000, 7000};
-        short key_3[2] = {6500, 7500};
-
+        short key_1[2] = {4500, 8500};
+        short key_2[2] = {4500, 8500};
+        short key_3[2] = {5000, 9000};
         struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+        test_key=rmi4_data->hw_if->board_data->button_test_flag;
         //step 1
         retval = read_report_select_type(F54_FULL_RAW_CAP_NO_RX_COUPLING);
         if (retval < 0) {
@@ -2844,7 +2841,7 @@ static ssize_t test_sysfs_ic_detect_show(struct device *dev,
 			{
 				min_cap = report_data_16[ ii * rx_num + jj ];
 			}
-			if ( report_data_16[ ii * rx_num + jj ] < low_cap || report_data_16[ ii * rx_num + jj ] > up_cap) {
+			if ( report_data_16[ ii * rx_num + jj ] < rmi4_data->hw_if->board_data->factory_low_cap || report_data_16[ ii * rx_num + jj ] > rmi4_data->hw_if->board_data->factory_up_cap) {
 				dev_err(rmi4_data->pdev->dev.parent, "%s: test fail, ii=%d, jj=%d, val=%d\n", __func__, ii, jj, report_data_16[ ii * rx_num + jj ]);
 				retval = -EINVAL;
 				goto step1_done;
@@ -2875,7 +2872,7 @@ step1_done:
 	                            report_data_16[ ( tx_num -1 ) *  rx_num + rx_num - 2 ], \
 	                            report_data_16[ ( tx_num -1 ) *  rx_num + rx_num - 1 ],\
 	                            min_cap, max_cap);
-		dev_err(rmi4_data->pdev->dev.parent, "%s:step 1 panel ref[%d, %d], key1[%d, %d], key2[%d, %d], key3[%d, %d] \n", __func__, low_cap, up_cap, key_1[0], key_1[1], key_2[0], key_2[1], key_3[0], key_3[1]);
+		dev_err(rmi4_data->pdev->dev.parent, "%s:step 1 panel ref[%d, %d], key1[%d, %d], key2[%d, %d], key3[%d, %d] \n", __func__, rmi4_data->hw_if->board_data->factory_low_cap,rmi4_data->hw_if->board_data->factory_up_cap, key_1[0], key_1[1], key_2[0], key_2[1], key_3[0], key_3[1]);
 		for (ii = 0; ii < tx_num; ii++) {
 			pb = print_buf;
 			tlen = 0;
