@@ -279,6 +279,10 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_TYPEC,	/* Type-C */
 	POWER_SUPPLY_TYPE_UFP,		/* Type-C UFP */
 	POWER_SUPPLY_TYPE_DFP,		/* TYpe-C DFP */
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	POWER_SUUPLY_TYPE_NEOCHARGER,	/* NEO-Direct Charger */
+	POWER_SUPPLY_TYPE_EX_BATTERY,	/* External Fule Gauge */
+#endif
 };
 
 /* Indicates USB Type-C CC connection status */
