@@ -296,7 +296,7 @@ static ssize_t mdss_livedisplay_set_cabc(struct device *dev,
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
 	sscanf(buf, "%du", &level);
-	if (level >= CABC_OFF && level < CABC_MAX &&
+	if (level >= CABC_DISABLE && level < CABC_MAX &&
 				level != mlc->cabc_level) {
 		mlc->cabc_level = level;
 		mdss_livedisplay_event(mfd, MODE_CABC);
