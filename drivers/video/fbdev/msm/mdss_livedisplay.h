@@ -68,7 +68,7 @@ struct mdss_livedisplay_ctx {
 };
 
 enum {
-	CABC_DISABLE,
+	CABC_OFF,
 	CABC_UI,
 	CABC_IMAGE,
 	CABC_VIDEO,
