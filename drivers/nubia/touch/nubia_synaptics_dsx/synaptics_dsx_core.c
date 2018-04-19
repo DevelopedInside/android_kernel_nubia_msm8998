@@ -976,7 +976,7 @@ static ssize_t synaptics_rmi4_back_store(struct device *dev,
 }
 #endif
 
-unsigned int nubia_button_0d_enabled = 0;
+unsigned int nubia_button_0d_enabled = 1;
 static ssize_t synaptics_rmi4_0dbutton_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
