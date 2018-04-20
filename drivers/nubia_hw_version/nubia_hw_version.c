@@ -22,7 +22,7 @@
 #include <linux/of_device.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-#include <nubia_hw_version.h>
+#include "nubia_hw_version.h"
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/input.h>
