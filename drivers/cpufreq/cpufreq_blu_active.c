@@ -88,7 +88,7 @@ struct cpufreq_blu_active_tunables {
 	 * The minimum amount of time to spend at a frequency before we can ramp
 	 * down.
 	 */
-#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (19 * USEC_PER_MSEC)
 	unsigned long min_sample_time;
 	/*
 	 * The sample rate of the timer used to increase frequency
@@ -1131,7 +1131,7 @@ static struct cpufreq_blu_active_tunables *alloc_tunable(
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
 	tunables->align_windows = true;
 	tunables->fastlane = true;
-	tunables->fastlane_threshold = 30;
+	tunables->fastlane_threshold = 10;
 	tunables->io_is_busy = true;
 
 	spin_lock_init(&tunables->target_loads_lock);
