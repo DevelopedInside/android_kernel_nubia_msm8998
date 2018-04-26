@@ -1582,7 +1582,6 @@ static struct cpufreq_interactive_tunables *alloc_tunable(
 	tunables->hispeed_freq = 1248000;
 	tunables->io_is_busy = true;
 	tunables->max_freq_hysteresis = 79000;
-	tunables->scaling_min_freq = 300000;
 	tunables->ignore_hispeed_on_notif = true;
 
 	spin_lock_init(&tunables->target_loads_lock);
