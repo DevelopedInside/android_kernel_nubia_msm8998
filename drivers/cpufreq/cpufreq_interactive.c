@@ -1577,6 +1577,13 @@ static struct cpufreq_interactive_tunables *alloc_tunable(
 	tunables->timer_rate = DEFAULT_TIMER_RATE;
 	tunables->boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
+	tunables->use_sched_load = true;
+	tunables->use_migration_notif = true;
+	tunables->hispeed_freq = 1248000;
+	tunables->io_is_busy = true;
+	tunables->max_freq_hysteresis = 79000;
+	tunables->scaling_min_freq = 300000;
+	tunables->ignore_hispeed_on_notif = true;
 
 	spin_lock_init(&tunables->target_loads_lock);
 	spin_lock_init(&tunables->above_hispeed_delay_lock);
