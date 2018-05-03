@@ -104,6 +104,13 @@ First Level Node - FG Gen3 device
 		    this property is not specified, then the default value used
 		    will be 75mA.
 
+- qcom,fg-cutoff-current
+	Usage:      optional
+	Value type: <u32>
+	Definition: Minimum Battery current (in mA) used for cutoff SOC
+		    estimate. If this property is not specified, then a default
+		    value of 500 mA will be applied.
+
 - qcom,fg-delta-soc-thr
 	Usage:      optional
 	Value type: <u32>
@@ -344,7 +351,7 @@ First Level Node - FG Gen3 device
 	Value type: <u32>
 	Definition: Value in micro percentage for low temperature ESR tight
 		    filter. If this is not specified, then a default value of
-		    48829 (4.88 %) will be used. Lowest possible value is 1954
+		    30000 (3 %) will be used. Lowest possible value is 1954
 		    (0.19 %).
 
 - qcom,fg-esr-broad-lt-filter-micro-pct
@@ -352,7 +359,7 @@ First Level Node - FG Gen3 device
 	Value type: <u32>
 	Definition: Value in micro percentage for low temperature ESR broad
 		    filter. If this is not specified, then a default value of
-		    148438 (14.84 %) will be used. Lowest possible value is
+		    30000 (3 %) will be used. Lowest possible value is
 		    1954 (0.19 %).
 
 - qcom,fg-auto-recharge-soc

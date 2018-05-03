@@ -33,10 +33,9 @@
 #define ARM64_HAS_NO_HW_PREFETCH		8
 #define ARM64_HAS_UAO				9
 #define ARM64_ALT_PAN_NOT_UAO			10
-
-#define ARM64_NCAPS				11
-#define ARM64_WORKAROUND_CAVIUM_27456		12	
-
+#define ARM64_WORKAROUND_CAVIUM_27456		11
+#define ARM64_HARDEN_BRANCH_PREDICTOR		12
+#define ARM64_NCAPS				13
 
 #ifndef __ASSEMBLY__
 
@@ -83,7 +82,7 @@ struct arm64_cpu_capabilities {
 	const char *desc;
 	u16 capability;
 	bool (*matches)(const struct arm64_cpu_capabilities *);
-	void (*enable)(void *);		/* Called on all active CPUs */
+	int (*enable)(void *);		/* Called on all active CPUs */
 	union {
 		struct {	/* To be used for erratum handling only */
 			u32 midr_model;
@@ -169,7 +168,9 @@ void __init setup_cpu_features(void);
 
 void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
 			    const char *info);
+void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps);
 void check_local_cpu_errata(void);
+void __init enable_errata_workarounds(void);
 
 #ifdef CONFIG_HOTPLUG_CPU
 void verify_local_cpu_capabilities(void);

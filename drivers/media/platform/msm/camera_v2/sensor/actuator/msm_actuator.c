@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -55,6 +55,11 @@ static int32_t msm_actuator_piezo_set_default_focus(
 	int32_t rc = 0;
 	struct msm_camera_i2c_reg_setting reg_setting;
 	CDBG("Enter\n");
+
+	if (a_ctrl->i2c_reg_tbl == NULL) {
+		pr_err("failed. i2c reg tabl is NULL");
+		return -EFAULT;
+	}
 
 	if (a_ctrl->curr_step_pos != 0) {
 		a_ctrl->i2c_tbl_index = 0;
@@ -550,6 +555,11 @@ static int32_t msm_actuator_piezo_move_focus(
 		return -EFAULT;
 	}
 
+	if (a_ctrl->i2c_reg_tbl == NULL) {
+		pr_err("failed. i2c reg tabl is NULL");
+		return -EFAULT;
+	}
+
 	if (dest_step_position > a_ctrl->total_steps) {
 		pr_err("Step pos greater than total steps = %d\n",
 			dest_step_position);
@@ -632,6 +642,14 @@ static int32_t msm_actuator_move_focus(
         //ZTEMT:jixd 20170313 add for af performance ---end        
         return -EFAULT;
     }
+    if (a_ctrl->i2c_reg_tbl == NULL) {
+        pr_err("failed. i2c reg tabl is NULL");
+        //ZTEMT:jixd 20170313 add for af performance ---start
+        preempt_enable();
+        kfree(ringing_params_kernel);
+        //ZTEMT:jixd 20170313 add for af performance ---end    
+        return -EFAULT;
+    }
     if (dest_step_pos > a_ctrl->total_steps) {
         pr_err("Step pos greater than total steps = %d\n",
         dest_step_pos);
@@ -653,7 +671,6 @@ static int32_t msm_actuator_move_focus(
         return -EFAULT;
     }
     /*Allocate memory for damping parameters of all regions*/
-    #if 0
     ringing_params_kernel = kmalloc(
         sizeof(struct damping_params_t)*(a_ctrl->region_size),
         GFP_KERNEL);
@@ -661,7 +678,6 @@ static int32_t msm_actuator_move_focus(
         pr_err("kmalloc for damping parameters failed\n");
         return -EFAULT;
     }
-    #endif
     if (copy_from_user(ringing_params_kernel,
         &(move_params->ringing_params[0]),
         (sizeof(struct damping_params_t))*(a_ctrl->region_size))) {
@@ -679,6 +695,8 @@ static int32_t msm_actuator_move_focus(
         a_ctrl->curr_step_pos, dest_step_pos, curr_lens_pos);
 
     while (a_ctrl->curr_step_pos != dest_step_pos) {
+        if (a_ctrl->curr_region_index >= a_ctrl->region_size)
+            break;
         step_boundary =
             a_ctrl->region_params[a_ctrl->curr_region_index].
             step_bound[dir];
@@ -1354,12 +1372,10 @@ static int32_t msm_actuator_set_param(struct msm_actuator_ctrl_t *a_ctrl,
 
 	a_ctrl->region_size = set_info->af_tuning_params.region_size;
 	a_ctrl->pwd_step = set_info->af_tuning_params.pwd_step;
-	a_ctrl->total_steps = set_info->af_tuning_params.total_steps;
 
 	if (copy_from_user(&a_ctrl->region_params,
 		(void *)set_info->af_tuning_params.region_params,
 		a_ctrl->region_size * sizeof(struct region_params_t))) {
-		a_ctrl->total_steps = 0;
 		pr_err("Error copying region_params\n");
 		return -EFAULT;
 	}
@@ -1392,6 +1408,7 @@ static int32_t msm_actuator_set_param(struct msm_actuator_ctrl_t *a_ctrl,
 		(a_ctrl->i2c_reg_tbl != NULL)) {
 		kfree(a_ctrl->i2c_reg_tbl);
 	}
+
 	a_ctrl->i2c_reg_tbl = NULL;
 	a_ctrl->i2c_reg_tbl =
 		kmalloc(sizeof(struct msm_camera_i2c_reg_array) *
@@ -1400,6 +1417,8 @@ static int32_t msm_actuator_set_param(struct msm_actuator_ctrl_t *a_ctrl,
 		pr_err("kmalloc fail\n");
 		return -ENOMEM;
 	}
+
+	a_ctrl->total_steps = set_info->af_tuning_params.total_steps;
 
 	if (copy_from_user(&a_ctrl->reg_tbl,
 		(void *)set_info->actuator_params.reg_tbl_params,
@@ -1634,6 +1653,13 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 	}
 	kfree(a_ctrl->i2c_reg_tbl);
 	a_ctrl->i2c_reg_tbl = NULL;
+	if (a_ctrl->actuator_state == ACT_OPS_ACTIVE) {
+		rc = msm_actuator_power_down(a_ctrl);
+		if (rc < 0) {
+			pr_err("%s:%d Actuator Power down failed\n",
+				__func__, __LINE__);
+		}
+	}
 	a_ctrl->actuator_state = ACT_DISABLE_STATE;
 	mutex_unlock(a_ctrl->actuator_mutex);
 	CDBG("Exit\n");
