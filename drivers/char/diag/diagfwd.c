@@ -1061,7 +1061,7 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 		/* send response back */
 		//driver->apps_rsp_buf[0] = *buf;
 		memcpy(driver->apps_rsp_buf,buf,3);
-		diag_send_rsp(driver->apps_rsp_buf, 1, info);
+		diag_send_rsp(driver->apps_rsp_buf, 1, pid);
 		msleep(5000);
 		printk(KERN_CRIT "diag: reboot set, Rebooting SoC..\n");
 		kernel_restart(NULL);
