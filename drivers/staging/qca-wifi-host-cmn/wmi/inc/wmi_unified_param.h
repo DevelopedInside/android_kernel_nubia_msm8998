@@ -98,6 +98,7 @@
 #define WMI_MSEC_TO_USEC(msec)       (msec * 1000) /* msec to usec */
 #define WMI_NLO_FREQ_THRESH          1000       /* in MHz */
 
+#define WMI_SVC_MSG_MAX_SIZE   1536
 #define MAX_UTF_EVENT_LENGTH	2048
 #define MAX_WMI_UTF_LEN	252
 #define MAX_WMI_QVIT_LEN	252
@@ -1222,6 +1223,63 @@ struct seg_hdr_info {
 };
 
 /**
+ * struct tx_send_params - TX parameters
+ * @pwr: Tx frame transmission power
+ * @mcs_mask: Modulation and coding index mask for transmission
+ *	      bit  0 -> CCK 1 Mbps rate is allowed
+ *	      bit  1 -> CCK 2 Mbps rate is allowed
+ *	      bit  2 -> CCK 5.5 Mbps rate is allowed
+ *	      bit  3 -> CCK 11 Mbps rate is allowed
+ *	      bit  4 -> OFDM BPSK modulation, 1/2 coding rate is allowed
+ *	      bit  5 -> OFDM BPSK modulation, 3/4 coding rate is allowed
+ *	      bit  6 -> OFDM QPSK modulation, 1/2 coding rate is allowed
+ *	      bit  7 -> OFDM QPSK modulation, 3/4 coding rate is allowed
+ *	      bit  8 -> OFDM 16-QAM modulation, 1/2 coding rate is allowed
+ *	      bit  9 -> OFDM 16-QAM modulation, 3/4 coding rate is allowed
+ *	      bit 10 -> OFDM 64-QAM modulation, 2/3 coding rate is allowed
+ *	      bit 11 -> OFDM 64-QAM modulation, 3/4 coding rate is allowed
+ * @nss_mask: Spatial streams permitted
+ *	      bit 0: if set, Nss = 1 (non-MIMO) is permitted
+ *	      bit 1: if set, Nss = 2 (2x2 MIMO) is permitted
+ *	      bit 2: if set, Nss = 3 (3x3 MIMO) is permitted
+ *	      bit 3: if set, Nss = 4 (4x4 MIMO) is permitted
+ *	      bit 4: if set, Nss = 5 (5x5 MIMO) is permitted
+ *	      bit 5: if set, Nss = 6 (6x6 MIMO) is permitted
+ *	      bit 6: if set, Nss = 7 (7x7 MIMO) is permitted
+ *	      bit 7: if set, Nss = 8 (8x8 MIMO) is permitted
+ *            If no bits are set, target will choose what NSS type to use
+ * @retry_limit: Maximum number of retries before ACK
+ * @chain_mask: Chains to be used for transmission
+ * @bw_mask: Bandwidth to be used for transmission
+ *	     bit  0 -> 5MHz
+ *	     bit  1 -> 10MHz
+ *	     bit  2 -> 20MHz
+ *	     bit  3 -> 40MHz
+ *	     bit  4 -> 80MHz
+ *	     bit  5 -> 160MHz
+ *	     bit  6 -> 80_80MHz
+ * @preamble_type: Preamble types for transmission
+ *	     bit 0: if set, OFDM
+ *	     bit 1: if set, CCK
+ *	     bit 2: if set, HT
+ *	     bit 3: if set, VHT
+ *	     bit 4: if set, HE
+ * @frame_type: Data or Management frame
+ *	        Data:1 Mgmt:0
+ */
+struct tx_send_params {
+	uint32_t pwr:8,
+		 mcs_mask:12,
+		 nss_mask:8,
+		 retry_limit:4;
+	uint32_t chain_mask:8,
+		 bw_mask:7,
+		 preamble_type:5,
+		 frame_type:1,
+		 reserved:11;
+};
+
+/**
  * struct wmi_mgmt_params - wmi mgmt cmd paramters
  * @tx_frame: management tx frame
  * @frm_len: frame length
@@ -1233,6 +1291,9 @@ struct seg_hdr_info {
  * @wmi_desc: command descriptor
  * @desc_id: descriptor id relyaed back by target
  * @macaddr - macaddr of peer
+ * @qdf_ctx: qdf context for qdf_nbuf_map
+ * @tx_param: TX send parameters
+ * @tx_params_valid: Flag that indicates if TX params are valid
  */
 struct wmi_mgmt_params {
 	void *tx_frame;
@@ -1243,6 +1304,8 @@ struct wmi_mgmt_params {
 	uint16_t desc_id;
 	uint8_t *macaddr;
 	void *qdf_ctx;
+	struct tx_send_params tx_param;
+	bool tx_params_valid;
 };
 
 /**
@@ -1552,6 +1615,11 @@ struct wmi_probe_resp_params {
 	uint32_t ucProxyProbeReqValidIEBmap[8];
 };
 
+struct key_seq_counter {
+    uint32_t key_seq_counter_l;
+    uint32_t key_seq_counter_h;
+};
+
 /* struct set_key_params: structure containing
  *                        installation key parameters
  * @vdev_id: vdev id
@@ -1564,6 +1632,7 @@ struct wmi_probe_resp_params {
  * @key_rxmic_len: rx mic length
  * @rx_iv: receive IV, applicable only in case of WAPI
  * @tx_iv: transmit IV, applicable only in case of WAPI
+ * @key_rsc_counter: RSC key counter
  * @key_data: key data
  */
 struct set_key_params {
@@ -1580,6 +1649,7 @@ struct set_key_params {
 	uint8_t tx_iv[16];
 #endif
 	uint8_t key_data[WMI_MAC_MAX_KEY_LENGTH];
+	struct key_seq_counter key_rsc_counter;
 };
 
 /**
@@ -3248,7 +3318,6 @@ struct ssid_hotlist_param {
 /**
  * struct roam_scan_filter_params - Structure holding roaming scan
  *                                  parameters
- * @len:                      length
  * @op_bitmap:                bitmap to determine reason of roaming
  * @session_id:               vdev id
  * @num_bssid_black_list:     The number of BSSID's that we should
@@ -3264,13 +3333,20 @@ struct ssid_hotlist_param {
  * @ssid_allowed_list:        Whitelist SSID's
  * @bssid_favored:            Favorable BSSID's
  * @bssid_favored_factor:     RSSI to be added to this BSSID to prefer it
+ * @lca_disallow_config_present: LCA [Last Connected AP] disallow config present
+ * @disallow_duration:        How long LCA AP will be disallowed before it
+ *                            can be a roaming candidate again, in seconds
+ * @rssi_channel_penalization:How much RSSI will be penalized if candidate(s)
+ *                            are found in the same channel as disallowed AP's,
+ *                            in units of db
+ * @num_disallowed_aps:       How many APs the target should maintain in its
+ *                            LCA list
  *
  * This structure holds all the key parameters related to
  * initial connection and roaming connections.
  */
 
 struct roam_scan_filter_params {
-	uint32_t len;
 	uint32_t op_bitmap;
 	uint8_t session_id;
 	uint32_t num_bssid_black_list;
@@ -3280,6 +3356,10 @@ struct roam_scan_filter_params {
 	struct mac_ssid ssid_allowed_list[MAX_SSID_ALLOWED_LIST];
 	struct qdf_mac_addr bssid_favored[MAX_BSSID_FAVORED];
 	uint8_t bssid_favored_factor[MAX_BSSID_FAVORED];
+	uint8_t lca_disallow_config_present;
+	uint32_t disallow_duration;
+	uint32_t rssi_channel_penalization;
+	uint32_t num_disallowed_aps;
 };
 
 /**
@@ -6838,6 +6918,146 @@ struct action_wakeup_set_param {
 	uint32_t operation;
 	uint32_t action_category_map[WMI_SUPPORTED_ACTION_CATEGORY_ELE_LIST];
 };
+
+/*
+ * Start of ACTION OUI definitions
+ * some of them have dependencies from wmi_unified.h
+ */
+
+/*
+ * Maximum number of action oui extensions supported in
+ * each action oui category
+ */
+#define WMI_ACTION_OUI_MAX_EXTENSIONS 10
+
+#define WMI_ACTION_OUI_MAX_OUI_LENGTH 5
+#define WMI_ACTION_OUI_MAX_DATA_LENGTH 20
+#define WMI_ACTION_OUI_MAX_DATA_MASK_LENGTH 3
+#define WMI_ACTION_OUI_MAC_MASK_LENGTH 1
+#define WMI_ACTION_OUI_MAX_CAPABILITY_LENGTH 1
+
+/*
+ * NSS Mask and NSS Offset to extract NSS info from
+ * capability field of action oui extension
+ */
+#define WMI_ACTION_OUI_CAPABILITY_NSS_MASK 0x0f
+#define WMI_ACTION_OUI_CAPABILITY_NSS_OFFSET 0
+#define WMI_ACTION_OUI_CAPABILITY_NSS_MASK_1X1 1
+#define WMI_ACTION_OUI_CAPABILITY_NSS_MASK_2X2 2
+#define WMI_ACTION_OUI_CAPABILITY_NSS_MASK_3X3 4
+#define WMI_ACTION_OUI_CAPABILITY_NSS_MASK_4X4 8
+
+/*
+ * Mask and offset to extract HT and VHT info from
+ * capability field of action oui extension
+ */
+#define WMI_ACTION_OUI_CAPABILITY_HT_ENABLE_MASK 0x10
+#define WMI_ACTION_OUI_CAPABILITY_HT_ENABLE_OFFSET 4
+#define WMI_ACTION_OUI_CAPABILITY_VHT_ENABLE_MASK 0x20
+#define WMI_ACTION_OUI_CAPABILITY_VHT_ENABLE_OFFSET 5
+
+/*
+ * Mask and offset to extract Band (2G and 5G) info from
+ * capability field of action oui extension
+ */
+#define WMI_ACTION_OUI_CAPABILITY_BAND_MASK 0xC0
+#define WMI_ACTION_OUI_CAPABILITY_BAND_OFFSET 6
+#define WMI_ACTION_OUI_CAPABILITY_2G_BAND_MASK 0x40
+#define WMI_ACTION_OUI_CAPABILITY_2G_BAND_OFFSET 6
+#define WMI_ACTION_CAPABILITY_5G_BAND_MASK 0x80
+#define WMI_ACTION_CAPABILITY_5G_BAND_OFFSET 7
+
+/**
+ * enum wmi_action_oui_id - to identify type of action oui
+ * @WMI_ACTION_OUI_CONNECT_1X1: for 1x1 connection only
+ * @WMI_ACTION_OUI_ITO_EXTENSION: for extending inactivity time of station
+ * @WMI_ACTION_OUI_CCKM_1X1: for TX with CCKM 1x1 only
+ * @WMI_ACTION_OUI_MAXIMUM_ID: maximun number of action oui types
+ */
+enum wmi_action_oui_id {
+	WMI_ACTION_OUI_CONNECT_1X1 = 0,
+	WMI_ACTION_OUI_ITO_EXTENSION = 1,
+	WMI_ACTION_OUI_CCKM_1X1 = 2,
+	WMI_ACTION_OUI_MAXIMUM_ID = 3,
+};
+
+/**
+ * enum wmi_action_oui_info - to indicate presence of various action OUI
+ * fields in action oui extension, following identifiers are to be set in
+ * the info mask field of action oui extension
+ * @WMI_ACTION_OUI_INFO_OUI: to indicate presence of OUI string
+ * @WMI_ACTION_OUI_INFO_MAC_ADDRESS: to indicate presence of mac address
+ * @WMI_ACTION_OUI_INFO_AP_CAPABILITY_NSS: to indicate presence of nss info
+ * @WMI_ACTION_OUI_INFO_AP_CAPABILITY_HT: to indicate presence of HT cap
+ * @WMI_ACTION_OUI_INFO_AP_CAPABILITY_VHT: to indicate presence of VHT cap
+ * @WMI_ACTION_OUI_INFO_AP_CAPABILITY_BAND: to indicate presence of band info
+ */
+enum wmi_action_oui_info {
+	/*
+	 * OUI centric parsing, expect OUI in each action OUI extension,
+	 * hence, WMI_ACTION_OUI_INFO_OUI is dummy
+	 */
+	WMI_ACTION_OUI_INFO_OUI = 1 << 0,
+	WMI_ACTION_OUI_INFO_MAC_ADDRESS = 1 << 1,
+	WMI_ACTION_OUI_INFO_AP_CAPABILITY_NSS = 1 << 2,
+	WMI_ACTION_OUI_INFO_AP_CAPABILITY_HT = 1 << 3,
+	WMI_ACTION_OUI_INFO_AP_CAPABILITY_VHT = 1 << 4,
+	WMI_ACTION_OUI_INFO_AP_CAPABILITY_BAND = 1 << 5,
+};
+
+/* Total mask of all enum wmi_action_oui_info IDs */
+#define WMI_ACTION_OUI_INFO_MASK 0x3F
+
+/**
+ * struct wmi_action_oui_extension - action oui extension contents
+ * @info_mask: info mask
+ * @oui_length: length of the oui, either 3 or 5 bytes
+ * @data_length: length of the oui data
+ * @data_mask_length: length of the data mask
+ * @mac_addr_length: length of the mac addr
+ * @mac_mask_length: length of the mac mask
+ * @capability_length: length of the capability
+ * @oui: oui value
+ * @data: data buffer
+ * @data_mask: data mask buffer
+ * @mac_addr: mac addr
+ * @mac_mask: mac mask
+ * @capability: capability buffer
+ */
+struct wmi_action_oui_extension {
+	uint32_t info_mask;
+	uint32_t oui_length;
+	uint32_t data_length;
+	uint32_t data_mask_length;
+	uint32_t mac_addr_length;
+	uint32_t mac_mask_length;
+	uint32_t capability_length;
+	uint8_t oui[WMI_ACTION_OUI_MAX_OUI_LENGTH];
+	uint8_t data[WMI_ACTION_OUI_MAX_DATA_LENGTH];
+	uint8_t data_mask[WMI_ACTION_OUI_MAX_DATA_MASK_LENGTH];
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t mac_mask[WMI_ACTION_OUI_MAC_MASK_LENGTH];
+	uint8_t capability[WMI_ACTION_OUI_MAX_CAPABILITY_LENGTH];
+};
+
+/**
+ * struct wmi_action_oui - Contains specific action oui information
+ * @action_id: type of action from enum wmi_action_oui_info
+ * @no_oui_extensions: number of action oui extensions of type @action_id
+ * @total_no_oui_extensions: total no of oui extensions from all
+ * action oui types, this is just a total count needed by firmware
+ * @extension: pointer to zero length array, to indicate this structure is
+ * followed by a array of @no_oui_extensions structures of
+ * type struct wmi_action_oui_extension
+ */
+struct wmi_action_oui {
+	enum wmi_action_oui_id action_id;
+	uint32_t no_oui_extensions;
+	uint32_t total_no_oui_extensions;
+	struct wmi_action_oui_extension extension[0];
+};
+
+/* End of ACTION OUI definitions */
 
 /**
  * struct set_arp_stats - set/reset arp stats

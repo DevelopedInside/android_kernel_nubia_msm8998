@@ -1804,6 +1804,48 @@ end:
 	return qdf_status;
 }
 #endif
+
+/**
+ * populate_tx_send_params - Populate TX param TLV for mgmt and offchan tx
+ *
+ * @bufp: Pointer to buffer
+ * @param: Pointer to tx param
+ *
+ * Return: QDF_STATUS_SUCCESS for success and QDF_STATUS_E_FAILURE for failure
+ */
+static inline QDF_STATUS populate_tx_send_params(uint8_t *bufp,
+					 struct tx_send_params param)
+{
+	wmi_tx_send_params *tx_param;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!bufp) {
+		status = QDF_STATUS_E_FAILURE;
+		return status;
+	}
+	tx_param = (wmi_tx_send_params *)bufp;
+	WMITLV_SET_HDR(&tx_param->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_tx_send_params,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_tx_send_params));
+	WMI_TX_SEND_PARAM_PWR_SET(tx_param->tx_param_dword0, param.pwr);
+	WMI_TX_SEND_PARAM_MCS_MASK_SET(tx_param->tx_param_dword0,
+				       param.mcs_mask);
+	WMI_TX_SEND_PARAM_NSS_MASK_SET(tx_param->tx_param_dword0,
+				       param.nss_mask);
+	WMI_TX_SEND_PARAM_RETRY_LIMIT_SET(tx_param->tx_param_dword0,
+					  param.retry_limit);
+	WMI_TX_SEND_PARAM_CHAIN_MASK_SET(tx_param->tx_param_dword1,
+					 param.chain_mask);
+	WMI_TX_SEND_PARAM_BW_MASK_SET(tx_param->tx_param_dword1,
+				      param.bw_mask);
+	WMI_TX_SEND_PARAM_PREAMBLE_SET(tx_param->tx_param_dword1,
+				       param.preamble_type);
+	WMI_TX_SEND_PARAM_FRAME_TYPE_SET(tx_param->tx_param_dword1,
+					 param.frame_type);
+
+	return status;
+}
+
 /**
  *  send_mgmt_cmd_tlv() - WMI scan start function
  *  @wmi_handle      : handle to WMI.
@@ -1820,14 +1862,15 @@ QDF_STATUS send_mgmt_cmd_tlv(wmi_unified_t wmi_handle,
 	uint64_t dma_addr;
 	void *qdf_ctx = param->qdf_ctx;
 	uint8_t *bufp;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int32_t bufp_len = (param->frm_len < mgmt_tx_dl_frm_len) ? param->frm_len :
 		mgmt_tx_dl_frm_len;
 
 	cmd_len = sizeof(wmi_mgmt_tx_send_cmd_fixed_param) +
-		WMI_TLV_HDR_SIZE + roundup(bufp_len, sizeof(uint32_t));
+		  WMI_TLV_HDR_SIZE +
+		  roundup(bufp_len, sizeof(uint32_t));
 
-	buf = wmi_buf_alloc(wmi_handle, cmd_len);
+	buf = wmi_buf_alloc(wmi_handle, sizeof(wmi_tx_send_params) + cmd_len);
 	if (!buf) {
 		WMI_LOGE("%s:wmi_buf_alloc failed", __func__);
 		return QDF_STATUS_E_NOMEM;
@@ -1864,9 +1907,21 @@ QDF_STATUS send_mgmt_cmd_tlv(wmi_unified_t wmi_handle,
 #endif
 	cmd->frame_len = param->frm_len;
 	cmd->buf_len = bufp_len;
+	cmd->tx_params_valid = param->tx_params_valid;
 
 	wmi_mgmt_cmd_record(wmi_handle, WMI_MGMT_TX_SEND_CMDID,
 			bufp, cmd->vdev_id, cmd->chanfreq);
+
+	bufp += roundup(bufp_len, sizeof(uint32_t));
+	if (param->tx_params_valid) {
+		status = populate_tx_send_params(bufp, param->tx_param);
+		if (status != QDF_STATUS_SUCCESS) {
+			WMI_LOGE("%s: Populate TX send params failed",
+				 __func__);
+			goto err1;
+		}
+		cmd_len += sizeof(wmi_tx_send_params);
+	}
 
 	if (wmi_unified_cmd_send(wmi_handle, buf, cmd_len,
 				      WMI_MGMT_TX_SEND_CMDID)) {
@@ -3476,8 +3531,8 @@ QDF_STATUS send_set_sta_keep_alive_cmd_tlv(wmi_unified_t wmi_handle,
 		if ((NULL == params->hostv4addr) ||
 			(NULL == params->destv4addr) ||
 			(NULL == params->destmac)) {
-			WMI_LOGE("%s: received null pointer, hostv4addr:%p "
-			   "destv4addr:%p destmac:%p ", __func__,
+			WMI_LOGE("%s: received null pointer, hostv4addr:%pK "
+			   "destv4addr:%pK destmac:%pK ", __func__,
 			   params->hostv4addr, params->destv4addr, params->destmac);
 			wmi_buf_free(buf);
 			return QDF_STATUS_E_FAILURE;
@@ -3780,6 +3835,8 @@ QDF_STATUS send_setup_install_key_cmd_tlv(wmi_unified_t wmi_handle,
 	key_data = (A_UINT8 *) (buf_ptr + WMI_TLV_HDR_SIZE);
 	qdf_mem_copy((void *)key_data,
 		     (const void *)key_params->key_data, key_params->key_len);
+	qdf_mem_copy(&cmd->key_rsc_counter, &key_params->key_rsc_counter,
+		     sizeof(wmi_key_seq_counter));
 	cmd->key_len = key_params->key_len;
 
 	status = wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -4891,10 +4948,21 @@ QDF_STATUS send_roam_scan_filter_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_mac_addr *bssid_dst_ptr = NULL;
 	wmi_ssid *ssid_ptr = NULL;
 	uint32_t *bssid_preferred_factor_ptr = NULL;
+	wmi_roam_lca_disallow_config_tlv_param *blist_param;
 
 	len = sizeof(wmi_roam_filter_fixed_param);
+
 	len += WMI_TLV_HDR_SIZE;
-	len += roam_req->len;
+	if (roam_req->num_bssid_black_list)
+		len += roam_req->num_bssid_black_list * sizeof(wmi_mac_addr);
+	len += WMI_TLV_HDR_SIZE;
+	if (roam_req->num_ssid_white_list)
+		len += roam_req->num_ssid_white_list * sizeof(wmi_ssid);
+	len += 2 * WMI_TLV_HDR_SIZE;
+	if (roam_req->num_bssid_preferred_list) {
+		len += roam_req->num_bssid_preferred_list * sizeof(wmi_mac_addr);
+		len += roam_req->num_bssid_preferred_list * sizeof(A_UINT32);
+	}
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -4965,6 +5033,26 @@ QDF_STATUS send_roam_scan_filter_cmd_tlv(wmi_unified_t wmi_handle,
 	}
 	buf_ptr += WMI_TLV_HDR_SIZE +
 		(roam_req->num_bssid_preferred_list * sizeof(uint32_t));
+
+	if (roam_req->lca_disallow_config_present) {
+		WMITLV_SET_HDR(buf_ptr,
+				WMITLV_TAG_ARRAY_STRUC,
+				sizeof(wmi_roam_lca_disallow_config_tlv_param));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+		blist_param =
+			(wmi_roam_lca_disallow_config_tlv_param *) buf_ptr;
+		WMITLV_SET_HDR(&blist_param->tlv_header,
+			WMITLV_TAG_STRUC_wmi_roam_lca_disallow_config_tlv_param,
+			WMITLV_GET_STRUCT_TLVLEN(
+				wmi_roam_lca_disallow_config_tlv_param));
+
+		blist_param->disallow_duration = roam_req->disallow_duration;
+		blist_param->rssi_channel_penalization =
+				roam_req->rssi_channel_penalization;
+		blist_param->num_disallowed_aps = roam_req->num_disallowed_aps;
+		blist_param->disallow_lca_enable_source_bitmap = 0x1;
+		buf_ptr += (sizeof(wmi_roam_lca_disallow_config_tlv_param));
+	}
 
 	status = wmi_unified_cmd_send(wmi_handle, buf,
 		len, WMI_ROAM_FILTER_CMDID);
@@ -9335,99 +9423,6 @@ QDF_STATUS send_update_tdls_peer_state_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /*
- * send_process_fw_mem_dump_cmd_tlv() - Function to request fw memory dump from
- * firmware
- * @wmi_handle:         Pointer to wmi handle
- * @mem_dump_req:       Pointer for mem_dump_req
- *
- * This function sends memory dump request to firmware
- *
- * Return: QDF_STATUS_SUCCESS for success otherwise failure
- *
- */
-QDF_STATUS send_process_fw_mem_dump_cmd_tlv(wmi_unified_t wmi_handle,
-					struct fw_dump_req_param *mem_dump_req)
-{
-	wmi_get_fw_mem_dump_fixed_param *cmd;
-	wmi_fw_mem_dump *dump_params;
-	struct wmi_fw_dump_seg_req *seg_req;
-	int32_t len;
-	wmi_buf_t buf;
-	u_int8_t *buf_ptr;
-	int ret, loop;
-
-	/*
-	 * len = sizeof(fixed param) that includes tlv header +
-	 *       tlv header for array of struc +
-	 *       sizeof (each struct)
-	 */
-	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
-	len += mem_dump_req->num_seg * sizeof(wmi_fw_mem_dump);
-	buf = wmi_buf_alloc(wmi_handle, len);
-
-	if (!buf) {
-		WMI_LOGE(FL("Failed allocate wmi buffer"));
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	buf_ptr = (u_int8_t *) wmi_buf_data(buf);
-	qdf_mem_zero(buf_ptr, len);
-	cmd = (wmi_get_fw_mem_dump_fixed_param *) buf_ptr;
-
-	WMITLV_SET_HDR(&cmd->tlv_header,
-		WMITLV_TAG_STRUC_wmi_get_fw_mem_dump_fixed_param,
-		WMITLV_GET_STRUCT_TLVLEN(wmi_get_fw_mem_dump_fixed_param));
-
-	cmd->request_id = mem_dump_req->request_id;
-	cmd->num_fw_mem_dump_segs = mem_dump_req->num_seg;
-
-	/* TLV indicating array of structures to follow */
-	buf_ptr += sizeof(wmi_get_fw_mem_dump_fixed_param);
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       sizeof(wmi_fw_mem_dump) *
-		       cmd->num_fw_mem_dump_segs);
-
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	dump_params = (wmi_fw_mem_dump *) buf_ptr;
-
-	WMI_LOGI(FL("request_id:%d num_seg:%d"),
-		    mem_dump_req->request_id, mem_dump_req->num_seg);
-	for (loop = 0; loop < cmd->num_fw_mem_dump_segs; loop++) {
-		seg_req = (struct wmi_fw_dump_seg_req *)
-			  ((uint8_t *)(mem_dump_req->segment) +
-			    loop * sizeof(*seg_req));
-		WMITLV_SET_HDR(&dump_params->tlv_header,
-			    WMITLV_TAG_STRUC_wmi_fw_mem_dump_params,
-			    WMITLV_GET_STRUCT_TLVLEN(wmi_fw_mem_dump));
-		dump_params->seg_id = seg_req->seg_id;
-		dump_params->seg_start_addr_lo = seg_req->seg_start_addr_lo;
-		dump_params->seg_start_addr_hi = seg_req->seg_start_addr_hi;
-		dump_params->seg_length = seg_req->seg_length;
-		dump_params->dest_addr_lo = seg_req->dst_addr_lo;
-		dump_params->dest_addr_hi = seg_req->dst_addr_hi;
-		WMI_LOGI(FL("seg_number:%d"), loop);
-		WMI_LOGI(FL("seg_id:%d start_addr_lo:0x%x start_addr_hi:0x%x"),
-			 dump_params->seg_id, dump_params->seg_start_addr_lo,
-			 dump_params->seg_start_addr_hi);
-		WMI_LOGI(FL("seg_length:%d dst_addr_lo:0x%x dst_addr_hi:0x%x"),
-			 dump_params->seg_length, dump_params->dest_addr_lo,
-			 dump_params->dest_addr_hi);
-		dump_params++;
-	}
-
-	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
-				   WMI_GET_FW_MEM_DUMP_CMDID);
-	if (ret) {
-		WMI_LOGE(FL("Failed to send get firmware mem dump request"));
-		wmi_buf_free(buf);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	WMI_LOGI(FL("Get firmware mem dump request sent successfully"));
-	return QDF_STATUS_SUCCESS;
-}
-
-/*
  * send_process_set_ie_info_cmd_tlv() - Function to send IE info to firmware
  * @wmi_handle:    Pointer to WMi handle
  * @ie_data:       Pointer for ie data
@@ -9848,8 +9843,8 @@ QDF_STATUS send_set_base_macaddr_indicate_cmd_tlv(wmi_unified_t wmi_handle,
  * Return: 0 on successfully enabling/disabling the events
  */
 QDF_STATUS send_log_supported_evt_cmd_tlv(wmi_unified_t wmi_handle,
-		uint8_t *event,
-		uint32_t len)
+					  uint8_t *event,
+					  uint32_t len)
 {
 	uint32_t num_of_diag_events_logs;
 	wmi_diag_event_log_config_fixed_param *cmd;
@@ -9870,6 +9865,15 @@ QDF_STATUS send_log_supported_evt_cmd_tlv(wmi_unified_t wmi_handle,
 	}
 	wmi_event = param_buf->fixed_param;
 	num_of_diag_events_logs = wmi_event->num_of_diag_events_logs;
+
+	if (num_of_diag_events_logs >
+	    param_buf->num_diag_events_logs_list) {
+		WMI_LOGE("message number of events %d is more than tlv hdr content %d",
+			 num_of_diag_events_logs,
+			 param_buf->num_diag_events_logs_list);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	evt_args = param_buf->diag_events_logs_list;
 	if (!evt_args) {
 		WMI_LOGE("%s: Event list is empty, num_of_diag_events_logs=%d",
@@ -9884,6 +9888,13 @@ QDF_STATUS send_log_supported_evt_cmd_tlv(wmi_unified_t wmi_handle,
 	if (wmi_handle->events_logs_list)
 		qdf_mem_free(wmi_handle->events_logs_list);
 
+	if (num_of_diag_events_logs >
+		(WMI_SVC_MSG_MAX_SIZE / sizeof(uint32_t))) {
+		WMI_LOGE("%s: excess num of logs:%d", __func__,
+			num_of_diag_events_logs);
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_INVAL;
+	}
 	/* Store the event list for run time enable/disable */
 	wmi_handle->events_logs_list = qdf_mem_malloc(num_of_diag_events_logs *
 			sizeof(uint32_t));
@@ -12884,6 +12895,303 @@ static QDF_STATUS send_get_rcpi_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * wmi_get_action_oui_id() - convert action id to firmware specific
+ * @action_id: host specific action id
+ * @id: output pointer to hold converted fw specific action id
+ *
+ * Return: true on conversion else failure
+ */
+static bool
+wmi_get_action_oui_id(enum wmi_action_oui_id action_id,
+		      wmi_vendor_oui_action_id *id)
+{
+	switch (action_id) {
+
+	case WMI_ACTION_OUI_CONNECT_1X1:
+		*id = WMI_VENDOR_OUI_ACTION_CONNECTION_1X1;
+		return true;
+
+	case WMI_ACTION_OUI_ITO_EXTENSION:
+		*id = WMI_VENDOR_OUI_ACTION_ITO_EXTENSION;
+		return true;
+
+	case WMI_ACTION_OUI_CCKM_1X1:
+		*id = WMI_VENDOR_OUI_ACTION_CCKM_1X1;
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+/**
+ * wmi_get_action_oui_info_mask() - convert info mask to firmware specific
+ * @info_mask: host specific info mask
+ *
+ * Return: firmware specific information mask
+ */
+static uint32_t
+wmi_get_action_oui_info_mask(uint32_t info_mask)
+{
+	uint32_t info_presence = WMI_BEACON_INFO_PRESENCE_OUI_EXT;
+
+	if (info_mask & WMI_ACTION_OUI_INFO_MAC_ADDRESS)
+		info_presence |= WMI_BEACON_INFO_PRESENCE_MAC_ADDRESS;
+
+	if (info_mask & WMI_ACTION_OUI_INFO_AP_CAPABILITY_NSS)
+		info_presence |= WMI_BEACON_INFO_PRESENCE_AP_CAPABILITY_NSS;
+
+	if (info_mask & WMI_ACTION_OUI_INFO_AP_CAPABILITY_HT)
+		info_presence |= WMI_BEACON_INFO_PRESENCE_AP_CAPABILITY_HT;
+
+	if (info_mask & WMI_ACTION_OUI_INFO_AP_CAPABILITY_VHT)
+		info_presence |= WMI_BEACON_INFO_PRESENCE_AP_CAPABILITY_VHT;
+
+	if (info_mask & WMI_ACTION_OUI_INFO_AP_CAPABILITY_BAND)
+		info_presence |= WMI_BEACON_INFO_PRESENCE_AP_CAPABILITY_BAND;
+
+	return info_presence;
+}
+
+/**
+ * wmi_fill_oui_extensions() - populates wmi_vendor_oui_ext array
+ * @extension: pointer to user supplied action oui extensions
+ * @no_oui_extns: number of action oui extensions
+ * @cmd_ext: output pointer to TLV
+ *
+ * This function parses the user supplied input data and populates the
+ * array of variable structures TLV in WMI_PDEV_CONFIG_VENDOR_OUI_ACTION_CMDID
+ *
+ * Return: None
+ */
+static void
+wmi_fill_oui_extensions(struct wmi_action_oui_extension *extension,
+			uint32_t no_oui_extns, wmi_vendor_oui_ext *cmd_ext)
+{
+	uint32_t i;
+	uint32_t buffer_length;
+
+	for (i = 0; i < no_oui_extns; i++) {
+		WMITLV_SET_HDR(&cmd_ext->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_vendor_oui_ext,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_vendor_oui_ext));
+		cmd_ext->info_presence_bit_mask =
+			wmi_get_action_oui_info_mask(extension->info_mask);
+
+		cmd_ext->oui_header_length = extension->oui_length;
+		cmd_ext->oui_data_length = extension->data_length;
+		cmd_ext->mac_address_length = extension->mac_addr_length;
+		cmd_ext->capability_data_length =
+					extension->capability_length;
+
+		buffer_length = extension->oui_length +
+				extension->data_length +
+				extension->data_mask_length +
+				extension->mac_addr_length +
+				extension->mac_mask_length +
+				extension->capability_length;
+
+		cmd_ext->buf_data_length = buffer_length + 1;
+
+		cmd_ext++;
+		extension++;
+	}
+
+}
+
+/**
+ * wmi_fill_oui_extensions_buffer() - populates data buffer in action oui cmd
+ * @extension: pointer to user supplied action oui extensions
+ * @cmd_ext: pointer to vendor_oui_ext TLV in action oui cmd
+ * @no_oui_extns: number of action oui extensions
+ * @rem_var_buf_len: remaining length of buffer to be populated
+ * @var_buf: output pointer to hold variable length data
+ *
+ * This function parses the user supplied input data and populates the variable
+ * buffer of type array byte TLV in WMI_PDEV_CONFIG_VENDOR_OUI_ACTION_CMDID
+ *
+ * Return: QDF_STATUS_SUCCESS for successful fill else QDF_STATUS_E_INVAL
+ */
+static QDF_STATUS
+wmi_fill_oui_extensions_buffer(struct wmi_action_oui_extension *extension,
+			       wmi_vendor_oui_ext *cmd_ext,
+			       uint32_t no_oui_extns, uint32_t rem_var_buf_len,
+			       uint8_t *var_buf)
+{
+	uint8_t i;
+
+	for (i = 0; i < (uint8_t)no_oui_extns; i++) {
+		if ((rem_var_buf_len - cmd_ext->buf_data_length) < 0) {
+			WMI_LOGE(FL("Invalid action oui command length"));
+			return QDF_STATUS_E_INVAL;
+		}
+
+		var_buf[0] = i;
+		var_buf++;
+
+		qdf_mem_copy(var_buf, extension->oui, extension->oui_length);
+		var_buf += extension->oui_length;
+
+		if (extension->data_length) {
+			qdf_mem_copy(var_buf, extension->data,
+				     extension->data_length);
+			var_buf += extension->data_length;
+		}
+
+		if (extension->data_mask_length) {
+			qdf_mem_copy(var_buf, extension->data_mask,
+				     extension->data_mask_length);
+			var_buf += extension->data_mask_length;
+		}
+
+		if (extension->mac_addr_length) {
+			qdf_mem_copy(var_buf, extension->mac_addr,
+				     extension->mac_addr_length);
+			var_buf += extension->mac_addr_length;
+		}
+
+		if (extension->mac_mask_length) {
+			qdf_mem_copy(var_buf, extension->mac_mask,
+				     extension->mac_mask_length);
+			var_buf += extension->mac_mask_length;
+		}
+
+		if (extension->capability_length) {
+			qdf_mem_copy(var_buf, extension->capability,
+				     extension->capability_length);
+			var_buf += extension->capability_length;
+		}
+
+		rem_var_buf_len -= cmd_ext->buf_data_length;
+		cmd_ext++;
+		extension++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * send_action_oui_cmd_tlv() - send action oui cmd to firmware
+ * @wmi_handle: wmi handler
+ * @action_oui: pointer to action oui info
+ *
+ * Return: QDF_STATUS_SUCCESS on successful transmission else
+ *         QDF_STATUS_E_INVAL or QDF_STATUS_E_NOMEM
+ */
+static QDF_STATUS
+send_action_oui_cmd_tlv(wmi_unified_t wmi_handle,
+			struct wmi_action_oui *action_oui)
+{
+	wmi_pdev_config_vendor_oui_action_fixed_param *cmd;
+	wmi_vendor_oui_ext *cmd_ext;
+	wmi_buf_t wmi_buf;
+	struct wmi_action_oui_extension *extension;
+	uint32_t len;
+	uint32_t i;
+	uint8_t *buf_ptr;
+	uint32_t no_oui_extns;
+	uint32_t total_no_oui_extns;
+	uint32_t var_buf_len = 0;
+	wmi_vendor_oui_action_id action_id;
+	bool valid;
+	uint32_t rem_var_buf_len;
+	QDF_STATUS status;
+
+	if (!action_oui) {
+		WMI_LOGE(FL("action oui is empty"));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	no_oui_extns = action_oui->no_oui_extensions;
+	total_no_oui_extns = action_oui->total_no_oui_extensions;
+
+	len = sizeof(*cmd);
+	len += WMI_TLV_HDR_SIZE; /* Array of wmi_vendor_oui_ext structures */
+
+	if (!no_oui_extns ||
+	    no_oui_extns > WMI_MAX_VENDOR_OUI_ACTION_SUPPORTED_PER_ACTION ||
+	    (total_no_oui_extns > WMI_VENDOR_OUI_ACTION_MAX_ACTION_ID *
+	     WMI_MAX_VENDOR_OUI_ACTION_SUPPORTED_PER_ACTION)) {
+		WMI_LOGE(FL("Invalid number of action oui extensions"));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	valid = wmi_get_action_oui_id(action_oui->action_id, &action_id);
+	if (!valid) {
+		WMI_LOGE(FL("Invalid action id"));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len += no_oui_extns * sizeof(*cmd_ext);
+	len += WMI_TLV_HDR_SIZE; /* Variable length buffer */
+
+	extension = action_oui->extension;
+	for (i = 0; i < no_oui_extns; i++) {
+		var_buf_len += extension->oui_length +
+		       extension->data_length +
+		       extension->data_mask_length +
+		       extension->mac_addr_length +
+		       extension->mac_mask_length +
+		       extension->capability_length;
+		extension++;
+	}
+
+	var_buf_len += no_oui_extns; /* to store indexes */
+	rem_var_buf_len = var_buf_len;
+	var_buf_len = (var_buf_len + 3) & ~0x3;
+	len += var_buf_len;
+
+	wmi_buf = wmi_buf_alloc(wmi_handle, len);
+	if (!wmi_buf) {
+		WMI_LOGE(FL("Failed to allocate wmi buffer"));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(wmi_buf);
+	cmd = (wmi_pdev_config_vendor_oui_action_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_pdev_config_vendor_oui_action_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+			wmi_pdev_config_vendor_oui_action_fixed_param));
+
+	cmd->action_id = action_id;
+	cmd->total_num_vendor_oui = total_no_oui_extns;
+	cmd->num_vendor_oui_ext = no_oui_extns;
+
+	buf_ptr += sizeof(*cmd);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       no_oui_extns * sizeof(*cmd_ext));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	cmd_ext = (wmi_vendor_oui_ext *)buf_ptr;
+	wmi_fill_oui_extensions(action_oui->extension, no_oui_extns, cmd_ext);
+
+	buf_ptr += no_oui_extns * sizeof(*cmd_ext);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, var_buf_len);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	status = wmi_fill_oui_extensions_buffer(action_oui->extension,
+						cmd_ext, no_oui_extns,
+						rem_var_buf_len, buf_ptr);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		wmi_buf_free(wmi_buf);
+		wmi_buf = NULL;
+		return QDF_STATUS_E_INVAL;
+	}
+
+	buf_ptr += var_buf_len;
+
+	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
+				 WMI_PDEV_CONFIG_VENDOR_OUI_ACTION_CMDID)) {
+		WMI_LOGE(FL("WMI_PDEV_CONFIG_VENDOR_OUI_ACTION send fail"));
+		wmi_buf_free(wmi_buf);
+		wmi_buf = NULL;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 struct wmi_ops tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_tlv,
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_tlv,
@@ -13062,7 +13370,6 @@ struct wmi_ops tlv_ops =  {
 	.send_set_tdls_offchan_mode_cmd = send_set_tdls_offchan_mode_cmd_tlv,
 	.send_update_fw_tdls_state_cmd = send_update_fw_tdls_state_cmd_tlv,
 	.send_update_tdls_peer_state_cmd = send_update_tdls_peer_state_cmd_tlv,
-	.send_process_fw_mem_dump_cmd = send_process_fw_mem_dump_cmd_tlv,
 	.send_process_set_ie_info_cmd = send_process_set_ie_info_cmd_tlv,
 #ifdef CONFIG_MCL
 	.send_init_cmd = send_init_cmd_tlv,
@@ -13143,6 +13450,7 @@ struct wmi_ops tlv_ops =  {
 				send_encrypt_decrypt_send_cmd_tlv,
 	.send_sar_limit_cmd = send_sar_limit_cmd_tlv,
 	.send_per_roam_config_cmd = send_per_roam_config_cmd_tlv,
+	.send_action_oui_cmd = send_action_oui_cmd_tlv,
 	.wmi_set_htc_tx_tag = wmi_set_htc_tx_tag_tlv,
 	.send_get_rcpi_cmd = send_get_rcpi_cmd_tlv,
 	.send_set_arp_stats_req_cmd = send_set_arp_stats_req_cmd_tlv,
@@ -13365,8 +13673,6 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 	event_ids[wmi_iface_link_stats_event_id] = WMI_IFACE_LINK_STATS_EVENTID;
 	event_ids[wmi_peer_link_stats_event_id] = WMI_PEER_LINK_STATS_EVENTID;
 	event_ids[wmi_radio_link_stats_link] = WMI_RADIO_LINK_STATS_EVENTID;
-	event_ids[wmi_update_fw_mem_dump_event_id] =
-				WMI_UPDATE_FW_MEM_DUMP_EVENTID;
 	event_ids[wmi_diag_event_id_log_supported_event_id] =
 				WMI_DIAG_EVENT_LOG_SUPPORTED_EVENTID;
 	event_ids[wmi_nlo_match_event_id] = WMI_NLO_MATCH_EVENTID;
