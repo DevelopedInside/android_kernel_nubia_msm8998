@@ -1475,14 +1475,14 @@ void wlan_hdd_netif_queue_control(hdd_adapter_t *adapter,
 		spin_lock_bh(&adapter->pause_map_lock);
 		temp_map = adapter->pause_map;
 		adapter->pause_map &= ~(1 << reason);
-		netif_wake_subqueue(adapter->dev, HDD_LINUX_AC_HI_PRIO);
+		netif_wake_subqueue(adapter->dev, HDD_LINUX_AC_VI);
 		wlan_hdd_update_pause_time(adapter, temp_map);
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
 
 	case WLAN_NETIF_PRIORITY_QUEUE_OFF:
 		spin_lock_bh(&adapter->pause_map_lock);
-		netif_stop_subqueue(adapter->dev, HDD_LINUX_AC_HI_PRIO);
+		netif_stop_subqueue(adapter->dev, HDD_LINUX_AC_VI);
 		wlan_hdd_update_txq_timestamp(adapter->dev);
 		wlan_hdd_update_unpause_time(adapter);
 		adapter->pause_map |= (1 << reason);
