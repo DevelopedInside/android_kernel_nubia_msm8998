@@ -578,7 +578,8 @@ static void __lim_process_operating_mode_action_frame(tpAniSirGlobal mac_ctx,
 			(operating_mode_frm->OperatingMode.rxNSS + 1)) {
 		sta_ptr->vhtSupportedRxNss =
 			operating_mode_frm->OperatingMode.rxNSS + 1;
-		lim_set_nss_change(mac_ctx, session, sta_ptr->vhtSupportedRxNss,
+		lim_set_nss_change(mac_ctx, session,
+			operating_mode_frm->OperatingMode.rxNSS,
 			sta_ptr->staIndex, mac_hdr->sa);
 	}
 
@@ -1996,6 +1997,13 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 
 			mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 			frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+			if (frame_len < sizeof(pub_action)) {
+				lim_log(mac_ctx, LOG1,
+					FL("Received action frame of invalid len %d"),
+					frame_len);
+				return;
+			}
+
 			/* Check if it is a P2P public action frame. */
 			if (!qdf_mem_cmp(pub_action->Oui, p2p_oui, 4)) {
 				/*
@@ -2207,6 +2215,12 @@ void lim_process_action_frame_no_session(tpAniSirGlobal pMac, uint8_t *pBd)
 
 			pHdr = WMA_GET_RX_MAC_HEADER(pBd);
 			frameLen = WMA_GET_RX_PAYLOAD_LEN(pBd);
+			if (frameLen < sizeof(pActionHdr)) {
+				lim_log(pMac, LOG1,
+					FL("Received action frame of invalid len %d"),
+					frameLen);
+				return;
+			}
 
 			/* Check if it is a P2P public action frame. */
 			if (!qdf_mem_cmp(pActionHdr->Oui, P2POui, 4)) {

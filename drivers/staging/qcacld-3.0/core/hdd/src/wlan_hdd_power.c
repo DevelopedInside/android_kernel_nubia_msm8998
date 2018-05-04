@@ -253,6 +253,15 @@ static int __wlan_hdd_ipv6_changed(struct notifier_block *nb,
 		status = wlan_hdd_validate_context(pHddCtx);
 		if (0 != status)
 			return NOTIFY_DONE;
+
+		/* Ignore if the interface is down */
+		if (!(ndev->flags & IFF_UP)) {
+			hdd_err("Rcvd change addr request on %s(flags 0x%X)",
+				ndev->name, ndev->flags);
+			hdd_err("NETDEV Interface is down, ignoring...");
+			return NOTIFY_DONE;
+		}
+
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 		hdd_debug("invoking sme_dhcp_done_ind");
 		sme_dhcp_done_ind(pHddCtx->hHal,
@@ -851,7 +860,8 @@ static void __hdd_ipv4_notifier_work_queue(struct work_struct *work)
 	 */
 	hdd_conf_arp_offload(pAdapter, true);
 
-	hdd_set_grat_arp_keepalive(pAdapter);
+	if (pHddCtx->config->sta_keepalive_method == HDD_STA_KEEPALIVE_GRAT_ARP)
+		hdd_set_grat_arp_keepalive(pAdapter);
 }
 
 /**
@@ -906,6 +916,14 @@ static int __wlan_hdd_ipv4_changed(struct notifier_block *nb,
 		status = wlan_hdd_validate_context(pHddCtx);
 		if (0 != status)
 			return NOTIFY_DONE;
+
+		/* Ignore if the interface is down */
+		if (!(ndev->flags & IFF_UP)) {
+			hdd_err("Rcvd change addr request on %s(flags 0x%X)",
+				ndev->name, ndev->flags);
+			hdd_err("NETDEV Interface is down, ignoring...");
+			return NOTIFY_DONE;
+		}
 
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 		hdd_debug("invoking sme_dhcp_done_ind");
@@ -1496,7 +1514,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	wlan_deregister_txrx_packetdump();
 
 	hdd_cleanup_scan_queue(pHddCtx);
-	hdd_ipa_uc_ssr_deinit();
 	hdd_reset_all_adapters(pHddCtx);
 
 	/* Flush cached rx frame queue */
@@ -1524,6 +1541,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		hdd_err("Failed to close CDS Scheduler");
 		QDF_ASSERT(false);
 	}
+	hdd_ipa_uc_ssr_deinit();
 
 	qdf_mc_timer_stop(&pHddCtx->tdls_source_timer);
 
@@ -2034,23 +2052,11 @@ next_adapter:
 			return -EAGAIN;
 		}
 
-		if (pScanInfo->mScanPending) {
-			INIT_COMPLETION(pScanInfo->abortscan_event_var);
-			hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
-					   INVALID_SCAN_ID,
-					   eCSR_SCAN_ABORT_DEFAULT);
+		hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
+				   INVALID_SCAN_ID, eCSR_SCAN_ABORT_DEFAULT);
 
-			status =
-				wait_for_completion_timeout(&pScanInfo->
-				    abortscan_event_var,
-				    msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-			if (!status) {
-				hdd_err("Timeout occurred while waiting for abort scan");
-				wlan_hdd_inc_suspend_stats(pHddCtx,
-							   SUSPEND_FAIL_SCAN);
-				return -ETIME;
-			}
-		}
+		/* for suspend case, don't wait for scan cancel completion */
+
 		status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
 		pAdapterNode = pNext;
 	}

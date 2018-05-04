@@ -46,6 +46,7 @@
 #include "cds_concurrency.h"
 #include "wma_api.h"
 #include "cds_utils.h"
+#include "wma.h"
 
 #define MAX_RATES                       12
 #define HDD_WAKE_LOCK_SCAN_DURATION (5 * 1000) /* in msec */
@@ -750,6 +751,9 @@ static int __iw_set_scan(struct net_device *dev, struct iw_request_info *info,
 	hdd_adapter_t *con_sap_adapter;
 	uint16_t con_dfs_ch;
 	int ret;
+	uint8_t source;
+	struct cfg80211_scan_request *req;
+	uint32_t timestamp;
 
 	ENTER_DEV(dev);
 
@@ -866,19 +870,21 @@ static int __iw_set_scan(struct net_device *dev, struct iw_request_info *info,
 		scanRequest.pIEField = pAdapter->scan_info.scanAddIE.addIEdata;
 	}
 	scanRequest.timestamp = qdf_mc_timer_get_system_time();
+	wma_get_scan_id(&scanRequest.scan_id);
+	pAdapter->scan_info.mScanPending = true;
+	wlan_hdd_scan_request_enqueue(pAdapter, NULL, NL_SCAN,
+			scanRequest.scan_id,
+			scanRequest.timestamp);
 	status = sme_scan_request((WLAN_HDD_GET_CTX(pAdapter))->hHal,
 				  pAdapter->sessionId, &scanRequest,
 				  &hdd_scan_request_callback, dev);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_alert("sme_scan_request  fail %d!!!", status);
+		wlan_hdd_scan_request_dequeue(hdd_ctx, scanRequest.scan_id,
+			&req, &source, &timestamp);
+		pAdapter->scan_info.mScanPending = false;
 		goto error;
 	}
-
-	wlan_hdd_scan_request_enqueue(pAdapter, NULL, NL_SCAN,
-			scanRequest.scan_id,
-			scanRequest.timestamp);
-
-	pAdapter->scan_info.mScanPending = true;
 error:
 	if ((wrqu->data.flags & IW_SCAN_THIS_ESSID) && (scanReq->essid_len))
 		qdf_mem_free(scanRequest.SSIDs.SSIDList);
@@ -1208,18 +1214,15 @@ static QDF_STATUS hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
 	uint32_t size = 0;
 
 	ret = wlan_hdd_validate_context(hddctx);
-	if (0 != ret)
+	if (ret) {
+		hdd_err("Invalid hdd_ctx; Drop results for scanId %d", scanId);
 		return QDF_STATUS_E_INVAL;
+	}
 
 	hdd_notice("called with hal = %p, pContext = %p, ID = %d, status = %d",
 		   halHandle, pContext, (int)scanId, (int)status);
 
 	pScanInfo->mScanPendingCounter = 0;
-
-	if (pScanInfo->mScanPending != true) {
-		QDF_ASSERT(pScanInfo->mScanPending);
-		goto allow_suspend;
-	}
 
 	if (QDF_STATUS_SUCCESS !=
 		wlan_hdd_scan_request_dequeue(hddctx, scanId, &req, &source,
@@ -1554,6 +1557,9 @@ static void wlan_hdd_update_scan_rand_attrs(void *scan_req,
 }
 #endif
 
+/* Define short name to use in cds_trigger_recovery */
+#define SCAN_FAILURE CDS_SCAN_ATTEMPT_FAILURES
+
 /**
  * __wlan_hdd_cfg80211_scan() - API to process cfg80211 scan request
  * @wiphy: Pointer to wiphy
@@ -1586,6 +1592,9 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	bool is_p2p_scan = false;
 	uint8_t curr_session_id;
 	scan_reject_states curr_reason;
+	struct cfg80211_scan_request *req;
+	uint32_t timestamp;
+	uint32_t scan_req_id;
 
 	ENTER();
 
@@ -1727,7 +1736,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 				} else if (pHddCtx->config->
 					   enableSelfRecovery) {
 					hdd_err("Triggering SSR due to scan stuck");
-					cds_trigger_recovery(false);
+					cds_trigger_recovery(SCAN_FAILURE);
 				} else {
 					hdd_err("QDF_BUG due to scan stuck");
 					QDF_BUG(0);
@@ -1843,6 +1852,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		hdd_notice("Channel-List: %s", chList);
 		hdd_notice("No. of Scan Channels: %d", num_chan);
 	}
+
 	if (!num_chan) {
 		hdd_err("Received zero non-dsrc channels");
 		status = -EINVAL;
@@ -1987,6 +1997,11 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 					WLAN_HDD_HOST_SCAN);
 
 	qdf_runtime_pm_prevent_suspend(&pHddCtx->runtime_context.scan);
+	wma_get_scan_id(&scan_req_id);
+	scan_req.scan_id = scan_req_id;
+	wlan_hdd_scan_request_enqueue(pAdapter, request, source,
+			scan_req.scan_id, scan_req.timestamp);
+	pAdapter->scan_info.mScanPending = true;
 	status = sme_scan_request(WLAN_HDD_GET_HAL_CTX(pAdapter),
 				pAdapter->sessionId, &scan_req,
 				&hdd_cfg80211_scan_done_callback, dev);
@@ -1999,14 +2014,14 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		} else {
 			status = -EIO;
 		}
-
+		wlan_hdd_scan_request_dequeue(pHddCtx, scan_req.scan_id,
+				&req, &source,
+				&timestamp);
+		pAdapter->scan_info.mScanPending = false;
 		qdf_runtime_pm_allow_suspend(&pHddCtx->runtime_context.scan);
 		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_SCAN);
 		goto free_mem;
 	}
-	wlan_hdd_scan_request_enqueue(pAdapter, request, source,
-			scan_req.scan_id, scan_req.timestamp);
-	pAdapter->scan_info.mScanPending = true;
 	pHddCtx->beacon_probe_rsp_cnt_per_scan = 0;
 
 free_mem:
@@ -2019,6 +2034,8 @@ free_mem:
 	EXIT();
 	return status;
 }
+
+#undef SCAN_FAILURE
 
 /**
  * wlan_hdd_cfg80211_scan() - API to process cfg80211 scan request
@@ -2278,7 +2295,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 			tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES], tmp)
 			n_channels++;
 	} else {
-		for (band = 0; band < NUM_NL80211_BANDS; band++)
+		for (band = 0; band < HDD_NUM_NL80211_BANDS; band++)
 			if (wiphy->bands[band])
 				n_channels += wiphy->bands[band]->n_channels;
 	}
@@ -2338,7 +2355,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 			count++;
 		}
 	} else {
-		for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		for (band = 0; band < HDD_NUM_NL80211_BANDS; band++) {
 			if (!wiphy->bands[band])
 				continue;
 			for (j = 0; j < wiphy->bands[band]->n_channels;
@@ -2358,17 +2375,20 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	request->n_channels = count;
 	count = 0;
 	if (tb[QCA_WLAN_VENDOR_ATTR_SCAN_SSIDS]) {
+		int ssid_length;
 		nla_for_each_nested(attr, tb[QCA_WLAN_VENDOR_ATTR_SCAN_SSIDS],
 				tmp) {
-			request->ssids[count].ssid_len = nla_len(attr);
-			if (request->ssids[count].ssid_len >
-				SIR_MAC_MAX_SSID_LENGTH) {
+			ssid_length = nla_len(attr);
+			if ((ssid_length > SIR_MAC_MAX_SSID_LENGTH) ||
+			    (ssid_length < 0)) {
 				hdd_err("SSID Len %d is not correct for network %d",
-					 request->ssids[count].ssid_len, count);
+					 ssid_length, count);
 				goto error;
 			}
+
+			request->ssids[count].ssid_len = ssid_length;
 			memcpy(request->ssids[count].ssid, nla_data(attr),
-					nla_len(attr));
+					ssid_length);
 			count++;
 		}
 	}
@@ -2380,7 +2400,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				request->ie_len);
 	}
 
-	for (count = 0; count < NUM_NL80211_BANDS; count++)
+	for (count = 0; count < HDD_NUM_NL80211_BANDS; count++)
 		if (wiphy->bands[count])
 			request->rates[count] =
 				(1 << wiphy->bands[count]->n_bitrates) - 1;
@@ -2390,7 +2410,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				    tb[QCA_WLAN_VENDOR_ATTR_SCAN_SUPP_RATES],
 				    tmp) {
 			band = nla_type(attr);
-			if (band >= NUM_NL80211_BANDS)
+			if (band >= HDD_NUM_NL80211_BANDS)
 				continue;
 			if (!wiphy->bands[band])
 				continue;

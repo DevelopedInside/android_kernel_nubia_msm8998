@@ -118,6 +118,9 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #define MAX_LEN_UDP_RESP_OFFLOAD 128
 
+/* Maximum peer station number query one time */
+#define MAX_PEER_STA 12
+
 /**
  * enum sir_conn_update_reason: Reason for conc connection update
  * @SIR_UPDATE_REASON_SET_OPER_CHAN: Set probable operating channel
@@ -1300,6 +1303,12 @@ typedef struct sSirSmeChanInfo {
 	enum phy_ch_width ch_width;
 } tSirSmeChanInfo, *tpSirSmeChanInfo;
 
+enum sir_sme_phy_mode {
+	SIR_SME_PHY_MODE_LEGACY = 0,
+	SIR_SME_PHY_MODE_HT = 1,
+	SIR_SME_PHY_MODE_VHT = 2
+};
+
 /* / Definition for Association indication from peer */
 /* / MAC ---> */
 typedef struct sSirSmeAssocInd {
@@ -1336,7 +1345,12 @@ typedef struct sSirSmeAssocInd {
 
 	/* Timing measurement capability */
 	uint8_t timingMeasCap;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
 	tSirSmeChanInfo chan_info;
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
+
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
 /* / Definition for Association confirm */
@@ -4021,6 +4035,57 @@ typedef struct sSirLinkSpeedInfo {
 	uint32_t estLinkSpeed;  /* Linkspeed from firmware */
 } tSirLinkSpeedInfo, *tpSirLinkSpeedInfo;
 
+/**
+ * struct sir_peer_info_req - peer info request struct
+ * @peer_macaddr: MAC address
+ * @sessionid: vdev id
+ *
+ * peer info request message's struct
+ */
+struct sir_peer_info_req {
+	struct qdf_mac_addr peer_macaddr;
+	uint8_t sessionid;
+};
+
+/**
+ * struct sir_peer_info - peer information struct
+ * @peer_macaddr: MAC address
+ * @rssi: rssi
+ * @tx_rate: last tx rate
+ * @rx_rate: last rx rate
+ *
+ * a station's information
+ */
+struct sir_peer_info {
+	struct qdf_mac_addr peer_macaddr;
+	int8_t rssi;
+	uint32_t tx_rate;
+	uint32_t rx_rate;
+};
+
+/**
+ * struct sir_peer_info_resp - all peers information struct
+ * @count: peer's number
+ * @info: peer information
+ *
+ * all station's information
+ */
+struct sir_peer_info_resp {
+	uint8_t count;
+	struct sir_peer_info info[0];
+};
+
+/**
+ * @sta_num: number of peer station which has valid info
+ * @info: peer information
+ *
+ * all SAP peer station's information saved in adapter
+ */
+struct sir_peer_sta_info {
+	uint8_t sta_num;
+	struct sir_peer_info info[MAX_PEER_STA];
+};
+
 typedef struct sSirAddPeriodicTxPtrn {
 	/* MAC Address for the adapter */
 	struct qdf_mac_addr mac_address;
@@ -5594,56 +5659,6 @@ struct chip_pwr_save_fail_detected_params {
 };
 
 #define MAX_NUM_FW_SEGMENTS 4
-
-/**
- * struct fw_dump_seg_req - individual segment details
- * @seg_id - segment id.
- * @seg_start_addr_lo - lower address of the segment.
- * @seg_start_addr_hi - higher address of the segment.
- * @seg_length - length of the segment.
- * @dst_addr_lo - lower address of the destination buffer.
- * @dst_addr_hi - higher address of the destination buffer.
- *
- * This structure carries the information to firmware about the
- * individual segments. This structure is part of firmware memory
- * dump request.
- */
-struct fw_dump_seg_req {
-	uint8_t seg_id;
-	uint32_t seg_start_addr_lo;
-	uint32_t seg_start_addr_hi;
-	uint32_t seg_length;
-	uint32_t dst_addr_lo;
-	uint32_t dst_addr_hi;
-};
-
-/**
- * struct fw_dump_req - firmware memory dump request details.
- * @request_id - request id.
- * @num_seg - requested number of segments.
- * @fw_dump_seg_req - individual segment information.
- *
- * This structure carries information about the firmware
- * memory dump request.
- */
-struct fw_dump_req {
-	uint32_t request_id;
-	uint32_t num_seg;
-	struct fw_dump_seg_req segment[MAX_NUM_FW_SEGMENTS];
-};
-
-/**
- * struct fw_dump_rsp - firmware dump response details.
- * @request_id - request id.
- * @dump_complete - copy completion status.
- *
- * This structure is used to store the firmware dump copy complete
- * response from the firmware.
- */
-struct fw_dump_rsp {
-	uint32_t request_id;
-	uint32_t dump_complete;
-};
 
 /**
  * DEFAULT_SCAN_IE_ID - Identifier for the collection of IE's added

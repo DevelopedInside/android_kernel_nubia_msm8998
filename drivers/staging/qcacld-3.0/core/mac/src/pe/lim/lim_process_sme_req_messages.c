@@ -3717,11 +3717,8 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 	       )
 
 	if (!LIM_IS_STA_ROLE(psessionEntry)) {
-		PELOGE(lim_log(pMac, LOGE, "AddTs received on AP - ignoring");)
-		lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
-				       psessionEntry, pSirAddts->req.tspec,
-				       smesessionId, smetransactionId);
-		return;
+		pe_err("AddTs received on AP - ignoring");
+		goto send_failure_addts_rsp;
 	}
 
 	pStaDs =
@@ -3729,22 +3726,14 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 				   &psessionEntry->dph.dphHashTable);
 
 	if (pStaDs == NULL) {
-		PELOGE(lim_log
-			       (pMac, LOGE, "Cannot find AP context for addts req");
-		       )
-		lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
-				       psessionEntry, pSirAddts->req.tspec,
-				       smesessionId, smetransactionId);
-		return;
+		pe_err("Cannot find AP context for addts req");
+		goto send_failure_addts_rsp;
 	}
 
 	if ((!pStaDs->valid) || (pStaDs->mlmStaContext.mlmState !=
 	    eLIM_MLM_LINK_ESTABLISHED_STATE)) {
-		lim_log(pMac, LOGE, "AddTs received in invalid MLM state");
-		lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
-				       psessionEntry, pSirAddts->req.tspec,
-				       smesessionId, smetransactionId);
-		return;
+		pe_err("AddTs received in invalid MLM state");
+		goto send_failure_addts_rsp;
 	}
 
 	pSirAddts->req.wsmTspecPresent = 0;
@@ -3760,13 +3749,8 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 	else if (pStaDs->lleEnabled)
 		pSirAddts->req.lleTspecPresent = 1;
 	else {
-		PELOGW(lim_log
-			       (pMac, LOGW, FL("ADDTS_REQ ignore - qos is disabled"));
-		       )
-		lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
-				       psessionEntry, pSirAddts->req.tspec,
-				       smesessionId, smetransactionId);
-		return;
+		pe_warn("ADDTS_REQ ignore - qos is disabled");
+		goto send_failure_addts_rsp;
 	}
 
 	if ((psessionEntry->limSmeState != eLIM_SME_ASSOCIATED_STATE) &&
@@ -3774,10 +3758,7 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 		lim_log(pMac, LOGE,
 			"AddTs received in invalid LIMsme state (%d)",
 			psessionEntry->limSmeState);
-		lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
-				       psessionEntry, pSirAddts->req.tspec,
-				       smesessionId, smetransactionId);
-		return;
+		goto send_failure_addts_rsp;
 	}
 
 	if (pMac->lim.gLimAddtsSent) {
@@ -3787,10 +3768,7 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 			pMac->lim.gLimAddtsReq.req.tspec.tsinfo.traffic.tsid,
 			pMac->lim.gLimAddtsReq.req.tspec.tsinfo.traffic.
 			userPrio);
-		lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
-				       psessionEntry, pSirAddts->req.tspec,
-				       smesessionId, smetransactionId);
-		return;
+		goto send_failure_addts_rsp;
 	}
 
 	sir_copy_mac_addr(peerMac, psessionEntry->bssId);
@@ -3812,21 +3790,21 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 		lim_log(pMac, LOGP,
 			FL("Unable to get Cfg param %d (Addts Rsp Timeout)"),
 			WNI_CFG_ADDTS_RSP_TIMEOUT);
-		return;
+		goto send_failure_addts_rsp;
 	}
 
 	timeout = SYS_MS_TO_TICKS(timeout);
 	if (tx_timer_change(&pMac->lim.limTimers.gLimAddtsRspTimer, timeout, 0)
 	    != TX_SUCCESS) {
-		lim_log(pMac, LOGP, FL("AddtsRsp timer change failed!"));
-		return;
+		pe_err("AddtsRsp timer change failed!");
+		goto send_failure_addts_rsp;
 	}
 	pMac->lim.gLimAddtsRspTimerCount++;
 	if (tx_timer_change_context(&pMac->lim.limTimers.gLimAddtsRspTimer,
 				    pMac->lim.gLimAddtsRspTimerCount) !=
 	    TX_SUCCESS) {
-		lim_log(pMac, LOGP, FL("AddtsRsp timer change failed!"));
-		return;
+		pe_err("AddtsRsp timer change failed!");
+		goto send_failure_addts_rsp;
 	}
 	MTRACE(mac_trace
 		       (pMac, TRACE_CODE_TIMER_ACTIVATE, psessionEntry->peSessionId,
@@ -3836,10 +3814,15 @@ static void __lim_process_sme_addts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 	pMac->lim.limTimers.gLimAddtsRspTimer.sessionId = sessionId;
 	if (tx_timer_activate(&pMac->lim.limTimers.gLimAddtsRspTimer) !=
 	    TX_SUCCESS) {
-		lim_log(pMac, LOGP, FL("AddtsRsp timer activation failed!"));
-		return;
+		pe_err("AddtsRsp timer activation failed!");
+		goto send_failure_addts_rsp;
 	}
 	return;
+
+send_failure_addts_rsp:
+	lim_send_sme_addts_rsp(pMac, pSirAddts->rspReqd, eSIR_FAILURE,
+			       psessionEntry, pSirAddts->req.tspec,
+			       smesessionId, smetransactionId);
 }
 
 static void __lim_process_sme_delts_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
@@ -5779,9 +5762,21 @@ lim_update_ibss_prop_add_ies(tpAniSirGlobal pMac, uint8_t **pDstData_buff,
 		qdf_mem_copy(vendor_ie, pModifyIE->pIEBuffer,
 				pModifyIE->ieBufferlength);
 	} else {
-		uint16_t new_length = pModifyIE->ieBufferlength + *pDstDataLen;
-		uint8_t *new_ptr = qdf_mem_malloc(new_length);
+		uint16_t new_length;
+		uint8_t *new_ptr;
 
+		/*
+		 * check for uint16 overflow before using sum of two numbers as
+		 * length of size to malloc
+		 */
+		if (USHRT_MAX - pModifyIE->ieBufferlength < *pDstDataLen) {
+			pe_err("U16 overflow due to %d + %d",
+				pModifyIE->ieBufferlength, *pDstDataLen);
+			return false;
+		}
+
+		new_length = pModifyIE->ieBufferlength + *pDstDataLen;
+		new_ptr = qdf_mem_malloc(new_length);
 		if (NULL == new_ptr) {
 			lim_log(pMac, LOGE, FL("Memory allocation failed."));
 			return false;
@@ -5956,8 +5951,18 @@ static void lim_process_update_add_ies(tpAniSirGlobal mac_ctx,
 		if (update_ie->append) {
 			/*
 			 * In case of append, allocate new memory
-			 * with combined length
+			 * with combined length.
+			 * Multiple back to back append commands
+			 * can lead to a huge length.So, check
+			 * for the validity of the length.
 			 */
+			if (addn_ie->probeRespDataLen >
+				(USHRT_MAX - update_ie->ieBufferlength)) {
+				pe_err("IE Length overflow, curr:%d, new:%d",
+					addn_ie->probeRespDataLen,
+					update_ie->ieBufferlength);
+				goto end;
+			}
 			new_length = update_ie->ieBufferlength +
 				addn_ie->probeRespDataLen;
 			new_ptr = qdf_mem_malloc(new_length);

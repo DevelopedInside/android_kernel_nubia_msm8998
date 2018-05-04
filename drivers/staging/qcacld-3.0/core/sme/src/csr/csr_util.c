@@ -861,7 +861,7 @@ uint16_t csr_check_concurrent_channel_overlap(tpAniSirGlobal mac_ctx,
 			QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION) ||
 		(cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL))) {
-		if (!((intf_ch < 14 && sap_ch < 14) ||
+		if (!((intf_ch <= 14 && sap_ch <= 14) ||
 			(intf_ch > 14 && sap_ch > 14)))
 			intf_ch = 0;
 		else if (cc_switch_mode ==
@@ -869,9 +869,7 @@ uint16_t csr_check_concurrent_channel_overlap(tpAniSirGlobal mac_ctx,
 			status =
 			    cds_get_sap_mandatory_channel((uint32_t *)&intf_ch);
 			if (QDF_IS_STATUS_ERROR(status)) {
-				sms_log(mac_ctx, LOGE,
-						FL("no mandatory channel"));
-				intf_ch = sap_ch;
+				sme_err("no mandatory channel");
 			}
 		}
 	} else if ((intf_ch == sap_ch) && (cc_switch_mode ==
@@ -881,9 +879,7 @@ uint16_t csr_check_concurrent_channel_overlap(tpAniSirGlobal mac_ctx,
 				cds_get_sap_mandatory_channel(
 						(uint32_t *)&intf_ch);
 			if (QDF_IS_STATUS_ERROR(status)) {
-				sms_log(mac_ctx, LOGE,
-						FL("no mandatory channel"));
-				intf_ch = sap_ch;
+				sme_err("no mandatory channel");
 			}
 		}
 	}
@@ -2368,10 +2364,6 @@ bool csr_is_profile11r(tCsrRoamProfile *pProfile)
 				   pProfile->MDID.mdiePresent);
 }
 
-
-#ifdef FEATURE_WLAN_ESE
-
-/* Function to return true if the authtype is ESE */
 bool csr_is_auth_type_ese(eCsrAuthType AuthType)
 {
 	switch (AuthType) {
@@ -2384,6 +2376,8 @@ bool csr_is_auth_type_ese(eCsrAuthType AuthType)
 	}
 	return false;
 }
+
+#ifdef FEATURE_WLAN_ESE
 
 /* Function to return true if the profile is ESE */
 bool csr_is_profile_ese(tCsrRoamProfile *pProfile)

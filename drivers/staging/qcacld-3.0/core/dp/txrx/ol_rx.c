@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -143,7 +143,12 @@ void ol_rx_send_pktlog_event(struct ol_txrx_pdev_t *pdev,
 {
 	struct ol_rx_remote_data data;
 
-	if (!pktlog_bit)
+	/**
+	 * pktlog is meant to log rx_desc information which is
+	 * already overwritten by radio header when monitor mode is ON.
+	 * Therefore, Do not log pktlog event when monitor mode is ON.
+	 */
+	if (!pktlog_bit || (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE))
 		return;
 
 	data.msdu = msdu;
@@ -159,6 +164,14 @@ void ol_rx_send_pktlog_event(struct ol_txrx_pdev_t *pdev,
 	struct ol_txrx_peer_t *peer, qdf_nbuf_t msdu, uint8_t pktlog_bit)
 {
 	struct ol_rx_remote_data data;
+
+	/**
+	 * pktlog is meant to log rx_desc information which is
+	 * already overwritten by radio header when monitor mode is ON.
+	 * Therefore, Do not log pktlog event when monitor mode is ON.
+	 */
+	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
+		return;
 
 	data.msdu = msdu;
 	if (peer)
@@ -193,7 +206,7 @@ void ol_rx_trigger_restore(htt_pdev_handle htt_pdev, qdf_nbuf_t head_msdu,
 	while (head_msdu) {
 		next = qdf_nbuf_next(head_msdu);
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-			  "freeing %p\n", head_msdu);
+			  "freeing %pK\n", head_msdu);
 		qdf_nbuf_free(head_msdu);
 		head_msdu = next;
 	}
@@ -750,7 +763,7 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 		return;
 	}
 	TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
-		   "sec spec for peer %p (%02x:%02x:%02x:%02x:%02x:%02x): "
+		   "sec spec for peer %pK (%02x:%02x:%02x:%02x:%02x:%02x): "
 		   "%s key of type %d\n",
 		   peer,
 		   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -907,13 +920,25 @@ ol_rx_inspect(struct ol_txrx_vdev_t *vdev,
 
 void
 ol_rx_offload_deliver_ind_handler(ol_txrx_pdev_handle pdev,
-				  qdf_nbuf_t msg, int msdu_cnt)
+				  qdf_nbuf_t msg, uint16_t msdu_cnt)
 {
 	int vdev_id, peer_id, tid;
 	qdf_nbuf_t head_buf, tail_buf, buf;
 	struct ol_txrx_peer_t *peer;
 	uint8_t fw_desc;
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
+
+	if (msdu_cnt > htt_rx_offload_msdu_cnt(htt_pdev)) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			"%s: invalid msdu_cnt=%u\n",
+			__func__,
+			msdu_cnt);
+
+		if (pdev->cfg.is_high_latency)
+			htt_rx_desc_frame_free(htt_pdev, msg);
+
+		return;
+	}
 
 	while (msdu_cnt) {
 		if (!htt_rx_offload_msdu_pop(htt_pdev, msg, &vdev_id, &peer_id,
@@ -1164,7 +1189,7 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 		if (OL_RX_DECAP(vdev, peer, msdu, &info) != A_OK) {
 			discard = 1;
 			TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
-				   "decap error %p from peer %p "
+				   "decap error %pK from peer %pK "
 				   "(%02x:%02x:%02x:%02x:%02x:%02x) len %d\n",
 				   msdu, peer,
 				   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1342,7 +1367,7 @@ ol_rx_discard(struct ol_txrx_vdev_t *vdev,
 
 		msdu_list = qdf_nbuf_next(msdu_list);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
-			   "discard rx %p from partly-deleted peer %p "
+			   "discard rx %pK from partly-deleted peer %pK "
 			   "(%02x:%02x:%02x:%02x:%02x:%02x)\n",
 			   msdu, peer,
 			   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1420,6 +1445,12 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	uint8_t pktlog_bit;
 #endif
 	uint32_t filled = 0;
+	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			   "%s:  Invalid tid, %u\n", __func__, tid);
+		WARN_ON(1);
+		return;
+	}
 
 	if (pdev) {
 		if (qdf_unlikely(QDF_GLOBAL_MONITOR_MODE == cds_get_conparam()))
@@ -1435,7 +1466,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	}
 
 #if defined(HELIUMPLUS_DEBUG)
-	qdf_print("%s %d: rx_ind_msg 0x%p peer_id %d tid %d is_offload %d\n",
+	qdf_print("%s %d: rx_ind_msg 0x%pK peer_id %d tid %d is_offload %d\n",
 		  __func__, __LINE__, rx_ind_msg, peer_id, tid, is_offload);
 #endif
 

@@ -628,7 +628,7 @@ tSmeCmd *sme_get_command_buffer(tpAniSirGlobal pMac)
 				false,
 				pMac->sme.enableSelfRecovery ? true : false);
 		else if (pMac->sme.enableSelfRecovery)
-			cds_trigger_recovery(false);
+			cds_trigger_recovery(CDS_GET_MSG_BUFF_FAILURE);
 		else
 			QDF_BUG(0);
 	}
@@ -1413,6 +1413,32 @@ void sme_update_fine_time_measurement_capab(tHalHandle hal, uint8_t session_id,
 			REASON_CONNECT_IES_CHANGED);
 }
 
+/**
+ * sme_alloc_action_oui_info() - alloc wrapper struct to hold all action ouis
+ * @pmac: pointer to mac context
+ *
+ * This function allocates wrapper struct to hold all the action ouis info
+ * and stores in mac context
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS sme_alloc_action_oui_info(tpAniSirGlobal pmac)
+{
+	struct action_oui_info *oui_info;
+
+	if (!pmac->enable_action_oui)
+		return QDF_STATUS_SUCCESS;
+
+	oui_info = qdf_mem_malloc(sizeof(*oui_info));
+	if (!oui_info) {
+		sme_err("Unable to alloc memory for action oui info");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	pmac->oui_info = oui_info;
+	return QDF_STATUS_SUCCESS;
+}
+
 /*--------------------------------------------------------------------------
 
    \brief sme_update_config() - Change configurations for all SME moduels
@@ -1481,6 +1507,11 @@ QDF_STATUS sme_update_config(tHalHandle hHal, tpSmeConfigParams pSmeConfigParams
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  "Could not pass on WNI_CFG_SCAN_IN_POWERSAVE to CFG");
 	}
+
+	pMac->enable_action_oui = pSmeConfigParams->enable_action_oui;
+
+	status = sme_alloc_action_oui_info(pMac);
+
 	return status;
 }
 
@@ -1978,33 +2009,6 @@ static QDF_STATUS sme_extended_change_channel_ind(tpAniSirGlobal mac_ctx,
 	return status;
 }
 
-/**
- * sme_process_fw_mem_dump_rsp - process fw memory dump response from WMA
- *
- * @mac_ctx: pointer to MAC handle.
- * @msg: pointer to received SME msg.
- *
- * This function process the received SME message and calls the corresponding
- * callback which was already registered with SME.
- *
- * Return: None
- */
-#ifdef WLAN_FEATURE_MEMDUMP
-static void sme_process_fw_mem_dump_rsp(tpAniSirGlobal mac_ctx, cds_msg_t *msg)
-{
-	if (msg->bodyptr) {
-		if (mac_ctx->sme.fw_dump_callback)
-			mac_ctx->sme.fw_dump_callback(mac_ctx->hHdd,
-				(struct fw_dump_rsp *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-	}
-}
-#else
-static void sme_process_fw_mem_dump_rsp(tpAniSirGlobal mac_ctx, cds_msg_t *msg)
-{
-}
-#endif
-
 #ifdef FEATURE_WLAN_ESE
 /**
  * sme_update_is_ese_feature_enabled() - enable/disable ESE support at runtime
@@ -2063,7 +2067,7 @@ QDF_STATUS sme_set_plm_request(tHalHandle hHal, tpSirPlmReq pPlmReq)
 	QDF_STATUS status;
 	bool ret = false;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-	uint8_t ch_list[WNI_CFG_VALID_CHANNEL_LIST] = { 0 };
+	uint8_t ch_list[WNI_CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t count, valid_count = 0;
 	cds_msg_t msg;
 	tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, pPlmReq->sessionId);
@@ -2863,6 +2867,12 @@ QDF_STATUS sme_process_msg(tHalHandle hHal, cds_msg_t *pMsg)
 		}
 		break;
 #endif
+	case eWNI_SME_GET_PEER_INFO_IND:
+		if (pMac->sme.pget_peer_info_ind_cb)
+			pMac->sme.pget_peer_info_ind_cb(pMsg->bodyptr,
+				pMac->sme.pget_peer_info_cb_context);
+		qdf_mem_free(pMsg->bodyptr);
+		break;
 	case eWNI_SME_CSA_OFFLOAD_EVENT:
 		if (pMsg->bodyptr) {
 			csr_scan_flush_bss_entry(pMac, pMsg->bodyptr);
@@ -2949,9 +2959,6 @@ QDF_STATUS sme_process_msg(tHalHandle hHal, cds_msg_t *pMsg)
 		qdf_mem_free(pMsg->bodyptr);
 		break;
 #endif
-	case eWNI_SME_FW_DUMP_IND:
-		sme_process_fw_mem_dump_rsp(pMac, pMsg);
-		break;
 	case eWNI_SME_SET_HW_MODE_RESP:
 		if (pMsg->bodyptr) {
 			status = sme_process_set_hw_mode_resp(pMac,
@@ -3371,7 +3378,7 @@ QDF_STATUS sme_scan_request(tHalHandle hal, uint8_t session_id,
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
 	struct ani_scan_req *scan_msg;
 	cds_msg_t msg;
-	uint32_t scan_req_id, scan_count;
+	uint32_t scan_count;
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_SME,
 		 TRACE_CODE_SME_RX_HDD_MSG_SCAN_REQ, session_id,
@@ -3393,8 +3400,6 @@ QDF_STATUS sme_scan_request(tHalHandle hal, uint8_t session_id,
 		sms_log(mac_ctx, LOGE, FL("Max scan reached"));
 		return QDF_STATUS_E_FAILURE;
 	}
-	wma_get_scan_id(&scan_req_id);
-	scan_req->scan_id = scan_req_id;
 
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -7135,7 +7140,7 @@ QDF_STATUS sme_configure_suspend_ind(tHalHandle hHal,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-	cds_msg_t cds_message;
+	cds_msg_t cds_message = {0};
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_SME,
 			 TRACE_CODE_SME_RX_HDD_CONFIG_SUSPENDIND, NO_SESSION,
@@ -9083,28 +9088,29 @@ QDF_STATUS sme_update_is_mawc_ini_feature_enabled(tHalHandle hHal,
 
 }
 
-/*--------------------------------------------------------------------------
-   \brief sme_stop_roaming() - Stop roaming for a given sessionId
-   This is a synchronous call
-   \param hHal      - The handle returned by mac_open
-   \param  sessionId - Session Identifier
-   \return QDF_STATUS_SUCCESS on success
-	   Other status on failure
-   \sa
-   --------------------------------------------------------------------------*/
-QDF_STATUS sme_stop_roaming(tHalHandle hHal, uint8_t sessionId, uint8_t reason)
+/**
+ * sme_stop_roaming() - Stop roaming for a given sessionId
+ *  This is a synchronous call
+ *
+ * @hHal      - The handle returned by mac_open
+ * @sessionId - Session Identifier
+ *
+ * Return QDF_STATUS_SUCCESS on success
+ *	   Other status on failure
+ */
+QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 {
 	tSirMsgQ wma_msg;
 	tSirRetStatus status;
 	tSirRoamOffloadScanReq *req;
-	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hHal);
-	void *wma = cds_get_context(QDF_MODULE_ID_WMA);
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	tpCsrNeighborRoamControlInfo roam_info;
 
-	if (!wma) {
-		sms_log(mac_ctx, LOGE, "wma is null");
-		return QDF_STATUS_E_NULL_VALUE;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("incorrect session/vdev ID");
+		return QDF_STATUS_E_INVAL;
 	}
-
+	roam_info = &mac_ctx->roam.neighborRoamInfo[session_id];
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {
 		sms_log(mac_ctx, LOGE, "failed to allocated memory");
@@ -9116,8 +9122,8 @@ QDF_STATUS sme_stop_roaming(tHalHandle hHal, uint8_t sessionId, uint8_t reason)
 		req->reason = REASON_ROAM_STOP_ALL;
 	else
 		req->reason = REASON_ROAM_SYNCH_FAILED;
-	req->sessionId = sessionId;
-	if (csr_neighbor_middle_of_roaming(mac_ctx, sessionId))
+	req->sessionId = session_id;
+	if (csr_neighbor_middle_of_roaming(mac_ctx, session_id))
 		req->middle_of_roaming = 1;
 	else
 		csr_roam_reset_roam_params(mac_ctx);
@@ -9132,6 +9138,8 @@ QDF_STATUS sme_stop_roaming(tHalHandle hHal, uint8_t sessionId, uint8_t reason)
 		qdf_mem_free(req);
 		return QDF_STATUS_E_FAULT;
 	}
+	roam_info->b_roam_scan_offload_started = false;
+	roam_info->last_sent_cmd = ROAM_SCAN_OFFLOAD_STOP;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -10782,6 +10790,53 @@ QDF_STATUS sme_get_link_speed(tHalHandle hHal, tSirLinkSpeedInfo *lsReq,
 	return status;
 }
 
+QDF_STATUS sme_get_peer_info(tHalHandle hal, struct sir_peer_info_req req,
+			void *context,
+			void (*callbackfn)(struct sir_peer_info_resp *param,
+						void *pcontext))
+{
+
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	tpAniSirGlobal mac = PMAC_STRUCT(hal);
+	cds_msg_t cds_message;
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (status == QDF_STATUS_SUCCESS) {
+		if (callbackfn == NULL) {
+			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				"%s: Indication Call back is NULL",
+				__func__);
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		mac->sme.pget_peer_info_ind_cb = callbackfn;
+		mac->sme.pget_peer_info_cb_context = context;
+
+		/* serialize the req through MC thread */
+		cds_message.bodyptr = qdf_mem_malloc(sizeof(req));
+		if (cds_message.bodyptr == NULL) {
+			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				"%s: Memory allocation failed.", __func__);
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_NOMEM;
+		}
+		qdf_mem_copy(cds_message.bodyptr, &req, sizeof(req));
+		cds_message.type = WMA_GET_PEER_INFO;
+		qdf_status = cds_mq_post_message(QDF_MODULE_ID_WMA,
+						 &cds_message);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				"%s: Post get peer info msg fail", __func__);
+			qdf_mem_free(cds_message.bodyptr);
+			status = QDF_STATUS_E_FAILURE;
+		}
+		sme_release_global_lock(&mac->sme);
+	}
+	return status;
+}
+
 /*
  * SME API to enable/disable WLAN driver initiated SSR
  */
@@ -11333,6 +11388,17 @@ void sme_set_prefer_80MHz_over_160MHz(tHalHandle hal,
 	mac_ctx->sta_prefer_80MHz_over_160MHz = sta_prefer_80MHz_over_160MHz;
 }
 
+/**
+ * sme_set_allow_adj_ch_bcn() - API to set allow_adj_ch_bcn
+ * @hal:           The handle returned by macOpen
+ * @allow_adj_ch_bcn: allow_adj_ch_bcn config param
+ */
+void sme_set_allow_adj_ch_bcn(tHalHandle hal, bool allow_adj_ch_bcn)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+
+	mac_ctx->allow_adj_ch_bcn = allow_adj_ch_bcn;
+}
 #ifdef WLAN_FEATURE_DSRC
 /**
  * sme_set_dot11p_config() - API to set the 802.11p config
@@ -12025,7 +12091,7 @@ void active_list_cmd_timeout_handle(void *userData)
 
 	if (mac_ctx->sme.enableSelfRecovery) {
 		sme_save_active_cmd_stats(hal);
-		cds_trigger_recovery(false);
+		cds_trigger_recovery(CDS_ACTIVE_LIST_TIMEOUT);
 	} else {
 		if (!mac_ctx->roam.configParam.enable_fatal_event &&
 		   !(cds_is_load_or_unload_in_progress() ||
@@ -14393,77 +14459,6 @@ QDF_STATUS sme_power_debug_stats_req(tHalHandle hal, void (*callback_fn)
 }
 #endif
 
-/**
- * sme_fw_mem_dump_register_cb() - Register fw memory dump callback
- *
- * @hal - MAC global handle
- * @callback_routine - callback routine from HDD
- *
- * This API is invoked by HDD to register its callback in SME
- *
- * Return: QDF_STATUS
- */
-#ifdef WLAN_FEATURE_MEMDUMP
-QDF_STATUS sme_fw_mem_dump_register_cb(tHalHandle hal,
-		void (*callback_routine)(void *cb_context,
-					 struct fw_dump_rsp *rsp))
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tpAniSirGlobal pmac = PMAC_STRUCT(hal);
-
-	status = sme_acquire_global_lock(&pmac->sme);
-	if (QDF_STATUS_SUCCESS == status) {
-		pmac->sme.fw_dump_callback = callback_routine;
-		sme_release_global_lock(&pmac->sme);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			  FL("sme_acquire_global_lock error"));
-	}
-
-	return status;
-}
-#else
-QDF_STATUS sme_fw_mem_dump_register_cb(tHalHandle hal,
-		void (*callback_routine)(void *cb_context,
-					 struct fw_dump_rsp *rsp))
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_MEMDUMP */
-
-/**
- * sme_fw_mem_dump_unregister_cb() - Unregister fw memory dump callback
- *
- * @hHal - MAC global handle
- *
- * This API is invoked by HDD to unregister its callback in SME
- *
- * Return: QDF_STATUS
- */
-#ifdef WLAN_FEATURE_MEMDUMP
-QDF_STATUS sme_fw_mem_dump_unregister_cb(tHalHandle hal)
-{
-	QDF_STATUS status;
-	tpAniSirGlobal pmac = PMAC_STRUCT(hal);
-
-	status = sme_acquire_global_lock(&pmac->sme);
-	if (QDF_STATUS_SUCCESS == status) {
-		pmac->sme.fw_dump_callback = NULL;
-		sme_release_global_lock(&pmac->sme);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			  FL("sme_acquire_global_lock error"));
-	}
-
-	return status;
-}
-#else
-QDF_STATUS sme_fw_mem_dump_unregister_cb(tHalHandle hal)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_MEMDUMP */
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /*--------------------------------------------------------------------------
    \brief sme_update_roam_offload_enabled() - enable/disable roam offload feaure
@@ -15429,83 +15424,6 @@ QDF_STATUS sme_set_rssi_monitoring(tHalHandle hal,
 
 	return status;
 }
-
-/**
- * sme_fw_mem_dump() - Get FW memory dump
- * @hHal: hal handle
- * @recvd_req: received memory dump request.
- *
- * This API is invoked by HDD to indicate FW to start
- * dumping firmware memory.
- *
- * Return: QDF_STATUS
- */
-#ifdef WLAN_FEATURE_MEMDUMP
-QDF_STATUS sme_fw_mem_dump(tHalHandle hHal, void *recvd_req)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-	cds_msg_t msg;
-	struct fw_dump_req *send_req;
-	struct fw_dump_seg_req seg_req;
-	int loop;
-
-	send_req = qdf_mem_malloc(sizeof(*send_req));
-	if (!send_req) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			FL("Memory allocation failed for WDA_FW_MEM_DUMP"));
-		return QDF_STATUS_E_FAILURE;
-	}
-	qdf_mem_copy(send_req, recvd_req, sizeof(*send_req));
-
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
-		  FL("request_id:%d num_seg:%d"),
-		  send_req->request_id, send_req->num_seg);
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
-		  FL("Segment Information"));
-	for (loop = 0; loop < send_req->num_seg; loop++) {
-		seg_req = send_req->segment[loop];
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
-			  FL("seg_number:%d"), loop);
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
-			  FL("seg_id:%d start_addr_lo:0x%x start_addr_hi:0x%x"),
-			  seg_req.seg_id, seg_req.seg_start_addr_lo,
-			  seg_req.seg_start_addr_hi);
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
-			  FL("seg_length:%d dst_addr_lo:0x%x dst_addr_hi:0x%x"),
-			  seg_req.seg_length, seg_req.dst_addr_lo,
-			  seg_req.dst_addr_hi);
-	}
-
-	if (QDF_STATUS_SUCCESS == sme_acquire_global_lock(&pMac->sme)) {
-		msg.bodyptr = send_req;
-		msg.type = WMA_FW_MEM_DUMP_REQ;
-		msg.reserved = 0;
-
-		qdf_status = cds_mq_post_message(QDF_MODULE_ID_WMA, &msg);
-		if (QDF_STATUS_SUCCESS != qdf_status) {
-			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				  FL("Not able to post WMA_FW_MEM_DUMP"));
-			qdf_mem_free(send_req);
-			status = QDF_STATUS_E_FAILURE;
-		}
-		sme_release_global_lock(&pMac->sme);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			FL("Failed to acquire SME Global Lock"));
-		qdf_mem_free(send_req);
-		status = QDF_STATUS_E_FAILURE;
-	}
-
-	return status;
-}
-#else
-QDF_STATUS sme_fw_mem_dump(tHalHandle hHal, void *recvd_req)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_MEMDUMP */
 
 /*
  * sme_pdev_set_pcl() - Send WMI_PDEV_SET_PCL_CMDID to the WMA
@@ -16866,24 +16784,31 @@ QDF_STATUS sme_update_sta_roam_policy(tHalHandle hal_handle,
 {
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_handle);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tSmeConfigParams sme_config;
+	tSmeConfigParams *sme_config;
 
 	if (!mac_ctx) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_FATAL,
 				"%s: mac_ctx is null", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
-	qdf_mem_zero(&sme_config, sizeof(sme_config));
-	sme_get_config_param(hal_handle, &sme_config);
 
-	sme_config.csrConfig.sta_roam_policy_params.dfs_mode =
+	sme_config = qdf_mem_malloc(sizeof(*sme_config));
+	if (!sme_config) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			FL("failed to allocate memory for sme_config"));
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_mem_zero(sme_config, sizeof(*sme_config));
+	sme_get_config_param(hal_handle, sme_config);
+
+	sme_config->csrConfig.sta_roam_policy_params.dfs_mode =
 		dfs_mode;
-	sme_config.csrConfig.sta_roam_policy_params.skip_unsafe_channels =
+	sme_config->csrConfig.sta_roam_policy_params.skip_unsafe_channels =
 		skip_unsafe_channels;
-	sme_config.csrConfig.sta_roam_policy_params.sap_operating_band =
+	sme_config->csrConfig.sta_roam_policy_params.sap_operating_band =
 		sap_operating_band;
 
-	sme_update_config(hal_handle, &sme_config);
+	sme_update_config(hal_handle, sme_config);
 
 	status = csr_update_channel_list(mac_ctx);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -16894,6 +16819,8 @@ QDF_STATUS sme_update_sta_roam_policy(tHalHandle hal_handle,
 		csr_roam_offload_scan(mac_ctx, session_id,
 				ROAM_SCAN_OFFLOAD_UPDATE_CFG,
 				REASON_ROAM_SCAN_STA_ROAM_POLICY_CHANGED);
+
+	qdf_mem_free(sme_config);
 	return status;
 }
 
@@ -17517,7 +17444,8 @@ free_scan_flter:
 
 QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 				const tSirMacAddr bssid,
-				uint8_t **frame_buf, uint32_t *frame_len)
+				uint8_t **frame_buf, uint32_t *frame_len,
+				int *channel)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tScanResultHandle result_handle = NULL;
@@ -17537,6 +17465,7 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 						profile, scan_filter);
 	if (QDF_STATUS_SUCCESS != status) {
 		sms_log(mac_ctx, LOGE, FL("prepare_filter failed"));
+		status = QDF_STATUS_E_FAULT;
 		goto free_scan_flter;
 	}
 
@@ -17557,6 +17486,7 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 	status = csr_scan_get_result(mac_ctx, scan_filter, &result_handle);
 	if (QDF_STATUS_SUCCESS != status) {
 		sms_log(mac_ctx, LOGE, FL("parse_scan_result failed"));
+		status = QDF_STATUS_E_FAULT;
 		goto free_scan_flter;
 	}
 
@@ -17581,8 +17511,8 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 	 */
 	ie_len = bss_descp->length + sizeof(bss_descp->length)
 		- (uint16_t)(offsetof(tSirBssDescription, ieFields[0]));
-	sms_log(mac_ctx, LOG1, FL("found bss_descriptor ie_len: %d"),
-		ie_len);
+	sms_log(mac_ctx, LOG1, FL("found bss_descriptor ie_len: %d channel %d"),
+		ie_len, bss_descp->channelId);
 
 	/* include mac header and fixed params along with IEs in frame */
 	*frame_len = SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_SSID_OFFSET + ie_len;
@@ -17595,6 +17525,8 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 	qdf_mem_zero(*frame_buf, *frame_len);
 	sme_prepare_beacon_from_bss_descp(*frame_buf, bss_descp, bssid, ie_len);
 
+	if (!*channel)
+		*channel = bss_descp->channelId;
 free_scan_flter:
 	/* free scan filter and exit */
 	if (scan_filter) {
@@ -17755,6 +17687,12 @@ QDF_STATUS sme_congestion_register_callback(tHalHandle hal,
 	return status;
 }
 
+QDF_STATUS sme_set_smps_cfg(uint32_t vdev_id, uint32_t param_id,
+						uint32_t param_val)
+{
+	return wma_configure_smps_params(vdev_id, param_id, param_val);
+}
+
 QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal, uint32_t vdev_id,
 			uint32_t param_id, uint32_t param_val, uint32_t req_cat)
 {
@@ -17784,3 +17722,394 @@ int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev)
 {
 	return wma_cli_set_command(vdev_id, param_id, sval, vpdev);
 }
+
+/**
+ * sme_set_vc_mode_config() - Set voltage corner config to FW
+ * @bitmap:	Bitmap that referes to voltage corner config with
+ * different phymode and bw configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap)
+{
+	void *wma_handle;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				"wma_handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (QDF_STATUS_SUCCESS !=
+		wma_set_vc_mode_config(wma_handle, vc_bitmap)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			"%s: Failed to set Voltage Control config to FW",
+			__func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * sme_alloc_action_oui() - allocate sme action oui
+ * @oui_info: wrapper structure holding all the action ouis
+ * @action_id: identifier of action oui for which memory is to be allocated
+ *
+ * This function allocates memory for action oui specified by action id
+ * and stores in the wrapper @oui_info
+ *
+ * Return: pointer to allocated action oui struct
+ */
+static struct
+ani_action_oui *sme_alloc_action_oui(struct action_oui_info *oui_info,
+				     enum wmi_action_oui_id action_id)
+{
+	struct ani_action_oui *action_oui;
+
+	action_oui = qdf_mem_malloc(sizeof(*action_oui));
+	if (!action_oui) {
+		sme_err("Failed to alloc memory for action oui");
+		return NULL;
+	}
+
+	action_oui->action_id = action_id;
+	qdf_list_create(&action_oui->oui_ext_list,
+			WMI_ACTION_OUI_MAX_EXTENSIONS);
+	qdf_mutex_create(&action_oui->oui_ext_list_lock);
+
+	oui_info->action_oui[action_id] = action_oui;
+	return action_oui;
+}
+
+QDF_STATUS sme_set_action_oui_ext(tHalHandle hal,
+				  struct wmi_action_oui_extension *wmi_ext,
+				  enum wmi_action_oui_id action_id)
+{
+	struct ani_action_oui_extension *sme_ext;
+	QDF_STATUS status;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	struct ani_action_oui *action_oui;
+
+	if (action_id > WMI_ACTION_OUI_MAXIMUM_ID) {
+		sme_err("Invalid OUI action ID");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!mac_ctx->oui_info) {
+		sme_err("action oui info not allocated");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	action_oui = mac_ctx->oui_info->action_oui[action_id];
+	if (!action_oui) {
+		action_oui = sme_alloc_action_oui(mac_ctx->oui_info, action_id);
+		if (!action_oui)
+			return QDF_STATUS_E_NOMEM;
+	} else {
+		if (qdf_list_size(&action_oui->oui_ext_list) ==
+			WMI_ACTION_OUI_MAX_EXTENSIONS) {
+			sme_err("Reached maximum OUI extensions");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	sme_ext = qdf_mem_malloc(sizeof(*sme_ext));
+	if (!sme_ext) {
+		sme_err("Failed to allocate memory for sme action oui extn");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	sme_ext->extension = *wmi_ext;
+
+	qdf_mutex_acquire(&action_oui->oui_ext_list_lock);
+	if (qdf_list_size(&action_oui->oui_ext_list) ==
+			  WMI_ACTION_OUI_MAX_EXTENSIONS) {
+		qdf_mutex_release(&action_oui->oui_ext_list_lock);
+		sme_err("Reached maximum OUI extensions");
+		status = QDF_STATUS_E_FAILURE;
+		goto mem_free;
+	}
+	qdf_list_insert_back(&action_oui->oui_ext_list, &sme_ext->item);
+	mac_ctx->oui_info->total_action_oui_extns++;
+	qdf_mutex_release(&action_oui->oui_ext_list_lock);
+
+	return QDF_STATUS_SUCCESS;
+
+mem_free:
+
+	qdf_mem_free(sme_ext);
+	sme_ext = NULL;
+
+	return status;
+}
+
+/**
+ * sme_prepare_action_oui() - allocate and prepare action oui extensions
+ * @mac_ctx: global mac context
+ * @sme_action: action oui for which wma message is to be prepared
+ * @wmi_action: output buffer to hold wma message contents
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+sme_prepare_action_oui(tpAniSirGlobal mac_ctx,
+		       struct ani_action_oui *sme_action,
+		       struct wmi_action_oui **action)
+{
+	struct wmi_action_oui *wmi_action;
+	struct wmi_action_oui_extension *extension;
+	qdf_list_node_t *node = NULL;
+	qdf_list_node_t *next_node = NULL;
+	qdf_list_t *oui_ext_list;
+	uint32_t len;
+	QDF_STATUS qdf_status;
+	uint32_t no_oui_extensions;
+	struct ani_action_oui_extension *sme_ext;
+
+	*action = NULL;
+	oui_ext_list = &sme_action->oui_ext_list;
+
+	len = sizeof(*wmi_action);
+
+	qdf_mutex_acquire(&sme_action->oui_ext_list_lock);
+	if (qdf_list_empty(oui_ext_list)) {
+		qdf_mutex_release(&sme_action->oui_ext_list_lock);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	no_oui_extensions = qdf_list_size(oui_ext_list);
+	len += no_oui_extensions * sizeof(*extension);
+
+	wmi_action = qdf_mem_malloc(len);
+	if (!wmi_action) {
+		sme_err("Failed to allocate memory for wmi_action_oui");
+		qdf_mutex_release(&sme_action->oui_ext_list_lock);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	wmi_action->action_id = sme_action->action_id;
+	wmi_action->no_oui_extensions = no_oui_extensions;
+	wmi_action->total_no_oui_extensions =
+				mac_ctx->oui_info->total_action_oui_extns;
+
+	node = NULL;
+	next_node = NULL;
+
+	extension = wmi_action->extension;
+
+	qdf_list_peek_front(oui_ext_list, &node);
+	while (node) {
+		sme_ext = qdf_container_of(node,
+					   struct ani_action_oui_extension,
+					   item);
+
+		*extension = sme_ext->extension;
+
+		qdf_status = qdf_list_peek_next(oui_ext_list, node, &next_node);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			break;
+
+		node = next_node;
+		next_node = NULL;
+
+		extension++;
+	}
+
+	qdf_mutex_release(&sme_action->oui_ext_list_lock);
+
+	*action = wmi_action;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_send_action_oui(tHalHandle hal,
+			       enum wmi_action_oui_id action_id)
+{
+	QDF_STATUS status;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	struct wmi_action_oui *wmi_action;
+	struct ani_action_oui *sme_action;
+	void *wma_handle;
+
+	if (action_id > WMI_ACTION_OUI_MAXIMUM_ID)
+		return QDF_STATUS_SUCCESS;
+
+	if (!mac_ctx->enable_action_oui || !mac_ctx->oui_info)
+		return QDF_STATUS_SUCCESS;
+
+	sme_action = mac_ctx->oui_info->action_oui[action_id];
+	if (!sme_action)
+		return QDF_STATUS_SUCCESS;
+
+	status = sme_prepare_action_oui(mac_ctx, sme_action, &wmi_action);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		return QDF_STATUS_E_NOMEM;
+
+	if (!wmi_action)
+		return QDF_STATUS_SUCCESS;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle) {
+		sme_err("wma handle is NULL");
+		status = QDF_STATUS_E_FAILURE;
+	} else {
+		status = wma_send_action_oui(wma_handle, wmi_action);
+	}
+
+	qdf_mem_free(wmi_action);
+	wmi_action = NULL;
+
+	return status;
+}
+
+/**
+ * sme_destroy_action_oui() - de-allocate memory for action oui extensions
+ * @action_oui: action_oui to be deleted
+ *
+ * Return: None
+ */
+static void sme_destroy_action_oui(struct ani_action_oui *action_oui)
+{
+	struct ani_action_oui_extension *sme_ext;
+	qdf_list_node_t *node = NULL;
+	qdf_list_t *oui_ext_list = &action_oui->oui_ext_list;
+	QDF_STATUS qdf_status;
+
+	if (!action_oui)
+		return;
+
+	qdf_mutex_acquire(&action_oui->oui_ext_list_lock);
+
+	if (qdf_list_empty(oui_ext_list))
+		goto free_action_oui;
+
+	while (!qdf_list_empty(oui_ext_list)) {
+		qdf_status = qdf_list_remove_front(oui_ext_list, &node);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			sme_err("Invalid node delete operation for action: %u",
+				action_oui->action_id);
+			break;
+		}
+
+		sme_ext = qdf_container_of(node,
+					   struct ani_action_oui_extension,
+					   item);
+		qdf_mem_free(sme_ext);
+		sme_ext = NULL;
+	}
+
+free_action_oui:
+
+	qdf_list_destroy(oui_ext_list);
+	qdf_mutex_release(&action_oui->oui_ext_list_lock);
+	qdf_mutex_destroy(&action_oui->oui_ext_list_lock);
+	qdf_mem_free(action_oui);
+	action_oui = NULL;
+}
+
+/**
+ * sme_destroy_action_oui_info() - destroy all action ouis info
+ * @pmac: pointer to mac context
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS sme_destroy_action_oui_info(tpAniSirGlobal pmac)
+{
+	struct action_oui_info *oui_info;
+	struct ani_action_oui *action_oui;
+	uint32_t i;
+
+	if (!pmac->oui_info)
+		return QDF_STATUS_SUCCESS;
+
+	oui_info = pmac->oui_info;
+	pmac->oui_info = NULL;
+	oui_info->total_action_oui_extns = 0;
+	for (i = 0; i < WMI_ACTION_OUI_MAXIMUM_ID; i++) {
+		action_oui = oui_info->action_oui[i];
+		oui_info->action_oui[i] = NULL;
+		sme_destroy_action_oui(action_oui);
+	}
+
+	qdf_mem_free(oui_info);
+	oui_info = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_destroy_config(tHalHandle hal)
+{
+	QDF_STATUS status;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+
+	mac_ctx->enable_action_oui = false;
+	status = sme_destroy_action_oui_info(mac_ctx);
+
+	return status;
+}
+
+QDF_STATUS sme_fast_reassoc(tHalHandle hal, tCsrRoamProfile *profile,
+			    const tSirMacAddr bssid, int channel,
+			    uint8_t vdev_id, const tSirMacAddr connected_bssid)
+{
+	QDF_STATUS status;
+	struct wma_roam_invoke_cmd *fastreassoc;
+	cds_msg_t msg = {0};
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+
+	fastreassoc = qdf_mem_malloc(sizeof(*fastreassoc));
+	if (NULL == fastreassoc) {
+		sme_err("qdf_mem_malloc failed for fastreassoc");
+		return QDF_STATUS_E_NOMEM;
+	}
+	/* if both are same then set the flag */
+	if (!qdf_mem_cmp(connected_bssid, bssid, ETH_ALEN)) {
+		sme_err("bssid same, bssid[%pM]", bssid);
+	}
+	fastreassoc->vdev_id = vdev_id;
+	fastreassoc->bssid[0] = bssid[0];
+	fastreassoc->bssid[1] = bssid[1];
+	fastreassoc->bssid[2] = bssid[2];
+	fastreassoc->bssid[3] = bssid[3];
+	fastreassoc->bssid[4] = bssid[4];
+	fastreassoc->bssid[5] = bssid[5];
+
+	status = sme_get_beacon_frm(hal, profile, bssid,
+				    &fastreassoc->frame_buf,
+				    &fastreassoc->frame_len,
+				    &channel);
+
+	if (!channel) {
+		sme_err("channel retrieval from BSS desc fails!");
+		qdf_mem_free(fastreassoc);
+		return QDF_STATUS_E_FAULT;
+	}
+
+	fastreassoc->channel = channel;
+	if (QDF_STATUS_SUCCESS != status) {
+		sme_err("sme_get_beacon_frm failed");
+		fastreassoc->frame_buf = NULL;
+		fastreassoc->frame_len = 0;
+	}
+
+	if (csr_is_auth_type_ese(mac_ctx->roam.roamSession[vdev_id].
+				connectedProfile.AuthType)) {
+		sme_err("Beacon is not required for ESE");
+		if (fastreassoc->frame_len) {
+			qdf_mem_free(fastreassoc->frame_buf);
+			fastreassoc->frame_buf = NULL;
+			fastreassoc->frame_len = 0;
+		}
+	}
+
+	msg.type = SIR_HAL_ROAM_INVOKE;
+	msg.reserved = 0;
+	msg.bodyptr = fastreassoc;
+	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &msg);
+	if (QDF_STATUS_SUCCESS != status) {
+		sme_err("Not able to post ROAM_INVOKE_CMD message to WMA");
+		qdf_mem_free(fastreassoc);
+	}
+
+	return status;
+}
+

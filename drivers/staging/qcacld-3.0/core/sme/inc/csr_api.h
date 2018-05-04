@@ -1243,6 +1243,7 @@ typedef struct tagCsrConfigParam {
 	uint8_t scanCfgAgingTime;
 	uint8_t enableTxLdpc;
 	uint8_t enableRxLDPC;
+	uint8_t disable_high_ht_mcs_2x2;
 	uint8_t max_amsdu_num;
 	uint8_t nSelect5GHzMargin;
 	uint8_t isCoalesingInIBSSAllowed;
@@ -1452,6 +1453,8 @@ typedef struct tagCsrRoamInfo {
 	tDot11fIEVHTOperation vht_operation;
 	tDot11fIEHTInfo ht_operation;
 	bool reassoc;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
 } tCsrRoamInfo;
 
 typedef struct tagCsrFreqScanInfo {
@@ -1479,6 +1482,10 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t timingMeasCap;
 	tSirSmeChanInfo chan_info;
 	uint8_t target_channel;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
 } tSirSmeAssocIndToUpperLayerCnf, *tpSirSmeAssocIndToUpperLayerCnf;
 
 typedef struct tagCsrSummaryStatsInfo {
@@ -1502,16 +1509,12 @@ typedef struct tagCsrSummaryStatsInfo {
 } tCsrSummaryStatsInfo;
 
 typedef struct tagCsrGlobalClassAStatsInfo {
-	uint32_t rx_frag_cnt;
-	uint32_t promiscuous_rx_frag_cnt;
-	/* uint32_t rx_fcs_err; */
-	uint32_t rx_input_sensitivity;
+	uint32_t nss;
 	uint32_t max_pwr;
-	/* uint32_t default_pwr; */
-	uint32_t sync_fail_cnt;
 	uint32_t tx_rate;
 	/* mcs index for HT20 and HT40 rates */
 	uint32_t mcs_index;
+	uint32_t mcs_rate_flags;
 	/* to diff between HT20 & HT40 rates;short & long guard interval */
 	uint32_t tx_rate_flags;
 

@@ -65,6 +65,7 @@
 #define SME_SESSION_ID_ANY        50
 
 #define SME_INVALID_COUNTRY_CODE "XX"
+#define INVALID_ROAM_ID 0
 
 #define SME_SET_CHANNEL_REG_POWER(reg_info_1, val) do {	\
 	reg_info_1 &= 0xff00ffff;	      \
@@ -94,6 +95,7 @@ typedef void (*hdd_ftm_msg_processor)(void *);
 typedef struct _smeConfigParams {
 	tCsrConfigParam csrConfig;
 	struct rrm_config_param rrmConfig;
+	bool enable_action_oui;
 } tSmeConfigParams, *tpSmeConfigParams;
 
 #ifdef FEATURE_WLAN_TDLS
@@ -256,6 +258,17 @@ static inline void sme_update_roam_pno_channel_prediction_config(
 #endif
 QDF_STATUS sme_update_config(tHalHandle hHal,
 		tpSmeConfigParams pSmeConfigParams);
+
+/**
+ * sme_destroy_config() - destroy the config params allocated dynamically
+ * @hal: handle returned by mac_open
+ *
+ * This function is used to de-allocate the memory for config params
+ * which are allocated using sme_update_config() function
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_destroy_config(tHalHandle hal);
 
 QDF_STATUS sme_set11dinfo(tHalHandle hHal, tpSmeConfigParams pSmeConfigParams);
 QDF_STATUS sme_get_soft_ap_domain(tHalHandle hHal,
@@ -929,11 +942,6 @@ QDF_STATUS sme_set_link_layer_stats_ind_cb(tHalHandle hHal,
 QDF_STATUS sme_reset_link_layer_stats_ind_cb(tHalHandle hhal);
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
-QDF_STATUS sme_fw_mem_dump(tHalHandle hHal, void *recvd_req);
-QDF_STATUS sme_fw_mem_dump_register_cb(tHalHandle hHal,
-		void (*callback_routine)(void *cb_context,
-		struct fw_dump_rsp *rsp));
-QDF_STATUS sme_fw_mem_dump_unregister_cb(tHalHandle hHal);
 QDF_STATUS sme_set_wisa_params(tHalHandle hal,
 				struct sir_wisa_params *wisa_params);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -1368,6 +1376,7 @@ QDF_STATUS sme_encrypt_decrypt_msg(tHalHandle hal,
 QDF_STATUS sme_set_cts2self_for_p2p_go(tHalHandle hal);
 void sme_set_prefer_80MHz_over_160MHz(tHalHandle hal,
 		bool sta_prefer_80MHz_over_160MHz);
+void sme_set_allow_adj_ch_bcn(tHalHandle hal, bool allow_adj_ch_bcn);
 QDF_STATUS sme_update_tx_fail_cnt_threshold(tHalHandle hal_handle,
 		uint8_t session_id, uint32_t tx_fail_count);
 QDF_STATUS sme_update_short_retry_limit_threshold(tHalHandle hal_handle,
@@ -1495,12 +1504,14 @@ QDF_STATUS sme_get_rssi_snr_by_bssid(tHalHandle hal, tCsrRoamProfile *profile,
  * @bssid: bssid to look for in scan cache
  * @frame_buf: frame buffer to populate
  * @frame_len: length of constructed frame
+ * @channel: Pointer to channel info to be filled
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 			    const tSirMacAddr bssid,
-			    uint8_t **frame_buf, uint32_t *frame_len);
+			    uint8_t **frame_buf, uint32_t *frame_len,
+			    int *channel);
 
 /**
  * sme_rso_cmd_status_cb() - Set RSO cmd status callback
@@ -1565,6 +1576,35 @@ QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal,
 			uint32_t param_val, uint32_t req_cat);
 
 /**
+ * sme_set_smps_cfg() - set SMPS config params
+ * @vdev_id: virtual device for the command
+ * @param_id: parameter id
+ * @param_val: parameter value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+
+QDF_STATUS sme_set_smps_cfg(uint32_t vdev_id, uint32_t param_id,
+								uint32_t param_val);
+
+/**
+ * sme_get_peer_info() - sme api to get peer info
+ * @hal: hal handle for getting global mac struct
+ * @req: peer info request struct send to wma
+ * @context: context of callback function
+ * @callbackfn: hdd callback function when receive response
+ *
+ * This function will send WMA_GET_PEER_INFO to WMA
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_get_peer_info(tHalHandle hal,
+		struct sir_peer_info_req req,
+		void *context,
+		void (*callbackfn)(struct sir_peer_info_resp *param,
+			void *pcontext));
+
+/**
  * sme_cli_set_command() - SME wrapper API over WMA "set" command
  * processor cmd
  * @vdev_id: virtual device for the command
@@ -1577,5 +1617,52 @@ QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal,
  * Return: 0 on success, errno on failure
  */
 int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev);
+
+/**
+ * sme_set_action_oui_ext() - set action oui extensions in pmac
+ * @hal: hal global context
+ * @wmi_ext: pointer to oui extension to be stored
+ * @action_id: action for which @wmi_ext is meant
+ *
+ * Return: if set is success return QDF_STATUS_SUCCESS
+ *         else QDF_STATUS_E_INVAL or QDF_STATUS_E_NOMEM
+ */
+QDF_STATUS sme_set_action_oui_ext(tHalHandle hal,
+				  struct wmi_action_oui_extension *wmi_ext,
+				  enum wmi_action_oui_id action_id);
+/**
+ * sme_send_action_oui() - send action oui extensions to wma
+ * @hal: hal global context
+ * @action_id: action for which oui extensions need to be send to wma
+ *
+ * Return: if set is success return QDF_STATUS_SUCCESS
+ *         else QDF_STATUS_E_INVAL or QDF_STATUS_E_NOMEM
+ */
+QDF_STATUS sme_send_action_oui(tHalHandle hal,
+			enum wmi_action_oui_id action_id);
+
+/**
+ * sme_set_vc_mode_config() - Set voltage corner config to FW.
+ * @bitmap:	Bitmap that refers to voltage corner config with
+ * different phymode and bw configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap);
+
+/**
+ * sme_fast_reassoc() - invokes FAST REASSOC command
+ * @hal: handle returned by mac_open
+ * @profile: current connected profile
+ * @bssid: bssid to look for in scan cache
+ * @channel: channel on which reassoc should be send
+ * @vdev_id: vdev id
+ * @connected_bssid: bssid of currently connected profile
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_fast_reassoc(tHalHandle hal, tCsrRoamProfile *profile,
+			    const tSirMacAddr bssid, int channel,
+			    uint8_t vdev_id, const tSirMacAddr connected_bssid);
 
 #endif /* #if !defined( __SME_API_H ) */

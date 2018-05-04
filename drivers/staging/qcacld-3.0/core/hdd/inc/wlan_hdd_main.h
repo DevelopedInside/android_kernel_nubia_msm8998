@@ -42,6 +42,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
+#include <linux/ieee80211.h>
 #include <qdf_list.h>
 #include <qdf_types.h>
 #include "sir_mac_prot_def.h"
@@ -77,6 +78,17 @@
 #define NUM_TX_QUEUES 4
 #endif
 
+#if (KERNEL_VERSION(4, 7, 0) <= LINUX_VERSION_CODE) || \
+	defined(CFG80211_REMOVE_IEEE80211_BACKPORT)
+#define HDD_NL80211_BAND_2GHZ   NL80211_BAND_2GHZ
+#define HDD_NL80211_BAND_5GHZ   NL80211_BAND_5GHZ
+#define HDD_NUM_NL80211_BANDS   NUM_NL80211_BANDS
+#else
+#define HDD_NL80211_BAND_2GHZ   IEEE80211_BAND_2GHZ
+#define HDD_NL80211_BAND_5GHZ   IEEE80211_BAND_5GHZ
+#define HDD_NUM_NL80211_BANDS   ((enum nl80211_band)IEEE80211_NUM_BANDS)
+#endif
+
 /** Length of the TX queue for the netdev */
 #define HDD_NETDEV_TX_QUEUE_LEN (3000)
 
@@ -86,6 +98,9 @@
 #else
 #define HDD_TX_TIMEOUT          msecs_to_jiffies(5000)
 #endif
+
+#define HDD_TX_STALL_THRESHOLD 4
+
 /** Hdd Default MTU */
 #define HDD_DEFAULT_MTU         (1500)
 
@@ -230,6 +245,9 @@
 #define WLAN_HDD_QOS_MAP_CONFIGURE 4
 #define HDD_SAP_WAKE_LOCK_DURATION 10000        /* in msecs */
 
+/* SAP client disconnect wake lock duration in milli seconds */
+#define HDD_SAP_CLIENT_DISCONNECT_WAKE_LOCK_DURATION (1000)
+
 #if defined(CONFIG_HL_SUPPORT)
 #define HDD_MOD_EXIT_SSR_MAX_RETRIES 200
 #else
@@ -279,6 +297,8 @@
 #define WLAN_NUD_STATS_LEN 800
 /* ARP packet type for NUD debug stats */
 #define WLAN_NUD_STATS_ARP_PKT_TYPE 1
+/* Assigned size of driver memory dump is 4096 bytes */
+#define DRIVER_MEM_DUMP_SIZE    4096
 
 /*
  * @eHDD_SCAN_REJECT_DEFAULT: default value
@@ -343,6 +363,7 @@ extern spinlock_t hdd_context_lock;
 extern struct mutex hdd_init_deinit_lock;
 
 #define STATS_CONTEXT_MAGIC 0x53544154  /* STAT */
+#define PEER_INFO_CONTEXT_MAGIC 0x50494E46  /* PEER_INFO(PINF) */
 #define RSSI_CONTEXT_MAGIC  0x52535349  /* RSSI */
 #define POWER_CONTEXT_MAGIC 0x504F5752  /* POWR */
 #define SNR_CONTEXT_MAGIC   0x534E5200  /* SNR */
@@ -410,6 +431,11 @@ typedef struct hdd_tx_rx_stats_s {
 	__u32    txflow_pause_cnt;
 	__u32    txflow_unpause_cnt;
 	__u32    txflow_timer_cnt;
+
+	/*tx timeout stats*/
+	__u32 tx_timeout_cnt;
+	__u32 cont_txtimeout_cnt;
+	u64 jiffies_last_txtimeout;
 } hdd_tx_rx_stats_t;
 
 #ifdef WLAN_FEATURE_11W
@@ -789,6 +815,39 @@ typedef struct {
 
 	/** Rate Flags for this connection */
 	uint32_t  rate_flags;
+
+	/** Tx rate with current station reported from F/W */
+	uint32_t tx_rate;
+
+	/** Rx rate with current station reported from F/W */
+	uint32_t rx_rate;
+
+	/** Channel Width of the connection */
+	uint8_t ch_width;
+
+	/** 802.11 Mode of the connection */
+	uint8_t dot11_mode;
+
+	/** Frequency of the current station reported from F/W */
+	uint32_t freq;
+
+	/** HT caps present or not in the current station */
+	bool ht_present;
+
+	/** VHT caps present or not in the current station */
+	bool vht_present;
+
+	/** HT capabilities of current station */
+	struct ieee80211_ht_cap ht_caps;
+
+	/** VHT capabilities of current station */
+	struct ieee80211_vht_cap vht_caps;
+
+	/** Disconnection reason code for current station*/
+	uint32_t reason_code;
+
+	/** RSSI of the current station reported from F/W */
+	int8_t rssi;
 } hdd_station_info_t;
 
 struct hdd_ap_ctx_s {
@@ -1012,6 +1071,8 @@ struct hdd_adapter_s {
 	hdd_stats_t hdd_stats;
 	/** linkspeed statistics */
 	tSirLinkSpeedInfo ls_stats;
+	/* SAP peer station info */
+	struct sir_peer_sta_info peer_sta_info;
 
 	uint8_t sessionId;
 
@@ -1071,6 +1132,8 @@ struct hdd_adapter_s {
 	/** Per-station structure */
 	spinlock_t staInfo_lock;        /* To protect access to station Info */
 	hdd_station_info_t aStaInfo[WLAN_MAX_STA_COUNT];
+	hdd_station_info_t cache_sta_info[WLAN_MAX_STA_COUNT];
+
 	/* uint8_t uNumActiveStation; */
 
 /*************************************************************
@@ -1400,6 +1463,34 @@ struct hdd_nud_stats_context {
 	struct completion response_event;
 };
 
+enum hdd_sta_smps_param {
+	/* RSSI threshold to enter Dynamic SMPS mode from inactive mode */
+	HDD_STA_SMPS_PARAM_UPPER_RSSI_THRESH = 0,
+	/*
+	 *  RSSI threshold to enter Stalled-D-SMPS mode from D-SMPS mode or
+	 * to enter D-SMPS mode from Stalled-D-SMPS mode
+	 */
+	HDD_STA_SMPS_PARAM_STALL_RSSI_THRESH = 1,
+	/* RSSI threshold to disable SMPS modes */
+	HDD_STA_SMPS_PARAM_LOWER_RSSI_THRESH = 2,
+	/* Upper threshold for beacon-RSSI. Used to reduce RX chainmask. */
+	HDD_STA_SMPS_PARAM_UPPER_BRSSI_THRESH = 3,
+	/* Lower threshold for beacon-RSSI. Used to increase RX chainmask. */
+	HDD_STA_SMPS_PARAM_LOWER_BRSSI_THRESH = 4,
+	/* Enable/Disable DTIM 1chRx feature */
+	HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE = 5
+};
+
+/**
+ * struct sta_ap_intf_check_work_ctx - sta_ap_intf_check_work
+ * related info
+ * @adapter: adaptor of the interface to which SAP to do SCC
+ *         with
+ */
+struct sta_ap_intf_check_work_ctx {
+	hdd_adapter_t *adapter;
+};
+
 /** Adapter structure definition */
 struct hdd_context_s {
 	/** Global CDS context  */
@@ -1536,7 +1627,7 @@ struct hdd_context_s {
 	/* defining the chip/rom revision */
 	uint32_t target_hw_revision;
 	/* chip/rom name */
-	const char *target_hw_name;
+	char *target_hw_name;
 	struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
 	uint16_t unsafe_channel_count;
@@ -1613,14 +1704,7 @@ struct hdd_context_s {
 	struct hdd_offloaded_packets_ctx op_ctx;
 #endif
 	bool mcc_mode;
-#ifdef WLAN_FEATURE_MEMDUMP
-	uint8_t *fw_dump_loc;
-	uint32_t dump_loc_paddr;
-	qdf_mc_timer_t memdump_cleanup_timer;
 	struct mutex memdump_lock;
-	bool memdump_in_progress;
-	bool memdump_init_done;
-#endif /* WLAN_FEATURE_MEMDUMP */
 	uint16_t driver_dump_size;
 	uint8_t *driver_dump_mem;
 
@@ -1674,7 +1758,6 @@ struct hdd_context_s {
 	qdf_atomic_t disable_lro_in_concurrency;
 	qdf_atomic_t disable_lro_in_low_tput;
 	qdf_atomic_t vendor_disable_lro_flag;
-	bool fw_mem_dump_enabled;
 	uint8_t last_scan_reject_session_id;
 	scan_reject_states last_scan_reject_reason;
 	unsigned long last_scan_reject_timestamp;
@@ -1682,8 +1765,16 @@ struct hdd_context_s {
 	bool rcpi_enabled;
 	bool imps_enabled;
 	int user_configured_pkt_filter_rules;
+	uint8_t curr_band;
 	struct hdd_nud_stats_context nud_stats_context;
 	uint32_t track_arp_ip;
+	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
+	qdf_wake_lock_t monitor_mode_wakelock;
+#ifdef WLAN_POWER_DEBUGFS
+	/* mutex lock to block concurrent access */
+	struct mutex power_stats_lock;
+#endif
+	qdf_atomic_t is_acs_allowed;
 };
 
 /*---------------------------------------------------------------------------
@@ -1763,6 +1854,17 @@ QDF_STATUS hdd_set_ibss_power_save_params(hdd_adapter_t *pAdapter);
 QDF_STATUS wlan_hdd_restart_driver(hdd_context_t *pHddCtx);
 void hdd_exchange_version_and_caps(hdd_context_t *pHddCtx);
 int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
+
+/**
+ * hdd_validate_adapter() - Validate the given adapter
+ * @adapter: the adapter to validate
+ *
+ * This function validates the given adapter, and ensures that it is open.
+ *
+ * Return: Errno
+ */
+int hdd_validate_adapter(hdd_adapter_t *adapter);
+
 bool hdd_is_valid_mac_address(const uint8_t *pMacAddr);
 QDF_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
 bool wlan_hdd_modules_are_enabled(hdd_context_t *hdd_ctx);
@@ -1893,26 +1995,6 @@ int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter);
 void hdd_get_fw_version(hdd_context_t *hdd_ctx,
 			uint32_t *major_spid, uint32_t *minor_spid,
 			uint32_t *siid, uint32_t *crmid);
-
-#ifdef WLAN_FEATURE_MEMDUMP
-/**
- * hdd_is_memdump_supported() - to check if memdump feature support
- *
- * This function is used to check if memdump feature is supported in
- * the host driver
- *
- * Return: true if supported and false otherwise
- */
-static inline bool hdd_is_memdump_supported(void)
-{
-	return true;
-}
-#else
-static inline bool hdd_is_memdump_supported(void)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_MEMDUMP */
 
 void hdd_update_macaddr(struct hdd_config *config,
 			struct qdf_mac_addr hw_macaddr);
@@ -2255,5 +2337,20 @@ void hdd_chip_pwr_save_fail_detected_cb(void *hdd_ctx,
  */
 int hdd_get_rssi_snr_by_bssid(hdd_adapter_t *adapter, const uint8_t *bssid,
 			      int8_t *rssi, int8_t *snr);
+
+/**
+ * hdd_get_stainfo() - get stainfo for the specified peer
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function find the stainfo for the peer with mac_addr
+ *
+ * Return: stainfo if found, NULL if not found
+ */
+hdd_station_info_t *hdd_get_stainfo(hdd_station_info_t *aStaInfo,
+				    struct qdf_mac_addr mac_addr);
+
+int hdd_driver_memdump_init(void);
+void hdd_driver_memdump_deinit(void);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

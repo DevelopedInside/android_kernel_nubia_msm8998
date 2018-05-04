@@ -388,22 +388,18 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 	 * message to the target.
 	 */
 	if (htt_htc_attach(pdev, HTT_DATA_MSG_SVC))
-		goto fail2;
+		goto htt_htc_attach_fail;
 	if (htt_htc_attach(pdev, HTT_DATA2_MSG_SVC))
-		;
-	/* TODO: enable the following line once FW is ready */
-	/* goto fail2; */
+		goto htt_htc_attach_fail;
 	if (htt_htc_attach(pdev, HTT_DATA3_MSG_SVC))
-		;
-	/* TODO: enable the following line once FW is ready */
-	/* goto fail2; */
+		goto htt_htc_attach_fail;
 	if (hif_ce_fastpath_cb_register(osc, htt_t2h_msg_handler_fast, pdev))
 		qdf_print("failed to register fastpath callback\n");
 
 success:
 	return pdev;
 
-fail2:
+htt_htc_attach_fail:
 	qdf_mem_free(pdev);
 
 fail1:
@@ -696,8 +692,11 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id)
 
 	status = htc_connect_service(pdev->htc_pdev, &connect, &response);
 
-	if (status != A_OK)
+	if (status != A_OK) {
+		if (!cds_is_fw_down())
+			QDF_BUG(0);
 		return -EIO;       /* failure */
+	}
 
 	htt_update_endpoint(pdev, service_id, response.Endpoint);
 
@@ -718,12 +717,12 @@ void htt_display(htt_pdev_handle pdev, int indent)
 	qdf_print("%*srx ring: space for %d elems, filled with %d buffers\n",
 		  indent + 4, " ",
 		  pdev->rx_ring.size, pdev->rx_ring.fill_level);
-	qdf_print("%*sat %p (%llx paddr)\n", indent + 8, " ",
+	qdf_print("%*sat %pK (%llx paddr)\n", indent + 8, " ",
 		  pdev->rx_ring.buf.paddrs_ring,
 		  (unsigned long long)pdev->rx_ring.base_paddr);
-	qdf_print("%*snetbuf ring @ %p\n", indent + 8, " ",
+	qdf_print("%*snetbuf ring @ %pK\n", indent + 8, " ",
 		  pdev->rx_ring.buf.netbufs_ring);
-	qdf_print("%*sFW_IDX shadow register: vaddr = %p, paddr = %llx\n",
+	qdf_print("%*sFW_IDX shadow register: vaddr = %pK, paddr = %llx\n",
 		  indent + 8, " ",
 		  pdev->rx_ring.alloc_idx.vaddr,
 		  (unsigned long long)pdev->rx_ring.alloc_idx.paddr);

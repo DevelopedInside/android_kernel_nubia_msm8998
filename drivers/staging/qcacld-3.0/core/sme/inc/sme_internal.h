@@ -199,6 +199,11 @@ typedef struct tagSmeStruct {
 	void (*pLinkSpeedIndCb)(tSirLinkSpeedInfo *indParam,
 			void *pDevContext);
 	void *pLinkSpeedCbContext;
+	/* get peer info callback */
+	void (*pget_peer_info_ind_cb)(struct sir_peer_info_resp *param,
+		  void *pcontext);
+	void *pget_peer_info_cb_context;
+
 #ifdef FEATURE_WLAN_EXTSCAN
 	void (*pExtScanIndCb)(void *, const uint16_t, void *);
 #endif /* FEATURE_WLAN_EXTSCAN */
@@ -228,9 +233,6 @@ typedef struct tagSmeStruct {
 	void *preferred_network_found_ind_cb_ctx;
 #endif /* FEATURE_WLAN_SCAN_PNO */
 	void (*rssi_threshold_breached_cb)(void *, struct rssi_breach_event *);
-#ifdef WLAN_FEATURE_MEMDUMP
-	void (*fw_dump_callback)(void *context, struct fw_dump_rsp *rsp);
-#endif
 	hw_mode_transition_cb sme_hw_mode_trans_cb;
 	/* OCB callbacks */
 	void *ocb_set_config_context;

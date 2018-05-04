@@ -86,6 +86,8 @@
 #endif
 #define WMA_MAX_SUPPORTED_BSS     5
 
+#define WMA_MAX_MGMT_MPDU_LEN 2000
+
 #define FRAGMENT_SIZE 3072
 
 #define MAX_PRINT_FAILURE_CNT 50
@@ -1028,6 +1030,8 @@ typedef struct {
  * @rcpi_req: rcpi request
  * It stores parameters per vdev in wma.
  * @in_bmps : Whether bmps for this interface has been enabled
+ * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
+ * @vdev_stop_wakelock: wakelock to protect vdev stop op with firmware
  */
 struct wma_txrx_node {
 	uint8_t addr[IEEE80211_ADDR_LEN];
@@ -1108,6 +1112,10 @@ struct wma_txrx_node {
 	struct sir_vdev_wow_stats wow_stats;
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;
+	struct beacon_filter_param beacon_filter;
+	bool beacon_filter_enabled;
+	qdf_wake_lock_t vdev_start_wakelock;
+	qdf_wake_lock_t vdev_stop_wakelock;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -1466,7 +1474,6 @@ struct peer_debug_info {
  * @wmi_cmd_rsp_wake_lock: wmi command response wake lock
  * @wmi_cmd_rsp_runtime_lock: wmi command response bus lock
  * @saved_chan: saved channel list sent as part of WMI_SCAN_CHAN_LIST_CMDID
- * @fw_mem_dump_enabled: Fw memory dump support
  * @ito_repeat_count: Indicates ito repeated count
  */
 typedef struct {
@@ -1549,6 +1556,8 @@ typedef struct {
 	uint8_t powersave_mode;
 	bool ptrn_match_enable_all_vdev;
 	void *pGetRssiReq;
+	bool get_sta_peer_info;
+	struct qdf_mac_addr peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
 	bool roam_offload_enabled;
 	/* Here ol_ini_info is used to store ini
@@ -1606,7 +1615,6 @@ typedef struct {
 	uint32_t new_hw_mode_index;
 	struct extended_caps phy_caps;
 	qdf_atomic_t scan_id_counter;
-	qdf_atomic_t num_pending_scans;
 	wma_peer_authorized_fp peer_authorized_cb;
 	uint32_t wow_unspecified_wake_count;
 
@@ -1659,7 +1667,6 @@ typedef struct {
 	tp_wma_packetdump_cb wma_mgmt_rx_packetdump_cb;
 	bool rcpi_enabled;
 	tSirLLStatsResults *link_stats_results;
-	bool fw_mem_dump_enabled;
 	bool tx_bfee_8ss_enabled;
 	tSirAddonPsReq ps_setting;
 	struct peer_debug_info *peer_dbg;
@@ -1850,6 +1857,7 @@ struct wma_set_key_params {
 	uint32_t key_idx;
 	bool unicast;
 	uint8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
+	uint8_t key_rsc[SIR_MAC_MAX_KEY_RSC_LEN];
 };
 
 /**
@@ -2488,5 +2496,25 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
  * Return: None
  */
 void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
+
+/**
+ * wma_configure_smps_params() - Configures the smps parameters to set
+ * @vdev_id: Virtual device for the command
+ * @param_id: SMPS parameter ID
+ * @param_val: Value to be set for the parameter
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
+							uint32_t param_val);
+
+/**
+ * wma_send_action_oui() - send of action oui extensions to firmware
+ * @handle: wma handle
+ * @action_oui: action oui buffer containg extensions to be send
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_action_oui(WMA_HANDLE handle,
+			       struct wmi_action_oui *action_oui);
 
 #endif

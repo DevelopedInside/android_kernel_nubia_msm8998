@@ -144,6 +144,8 @@ typedef enum {
 	 * result of various conditions
 	 */
 	eSAP_STA_DISASSOC_EVENT,
+
+	eSAP_STA_LOSTLINK_DETECTED,
 	/* Event sent when user called wlansap_set_key_sta */
 	eSAP_STA_SET_KEY_EVENT,
 	/* Event sent whenever there is MIC failure detected */
@@ -283,6 +285,10 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	uint8_t *assocRespPtr;
 	uint8_t timingMeasCap;
 	tSirSmeChanInfo chan_info;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
+	tDot11fIEHTCaps ht_caps;
+	tDot11fIEVHTCaps vht_caps;
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {
@@ -290,6 +296,7 @@ typedef struct sap_StationDisassocCompleteEvent_s {
 	uint8_t staId;          /* STAID should not be used */
 	uint8_t status;
 	uint32_t statusCode;
+	uint32_t reason_code;
 	eSapDisassocReason reason;
 } tSap_StationDisassocCompleteEvent;
 
@@ -500,6 +507,7 @@ struct sap_acs_cfg {
 	uint16_t   ch_width;
 	uint8_t    pcl_channels[QDF_MAX_NUM_CHAN];
 	uint32_t   pcl_ch_count;
+	uint8_t    weight_list[QDF_MAX_NUM_CHAN];
 	/* ACS Algo Output */
 	uint8_t    pri_ch;
 	uint8_t    ht_sec_ch;
@@ -898,7 +906,7 @@ QDF_STATUS wlansap_disassoc_sta(void *p_cds_gctx,
 QDF_STATUS wlansap_deauth_sta(void *p_cds_gctx,
 			struct tagCsrDelStaParams *pDelStaParams);
 QDF_STATUS wlansap_set_channel_change_with_csa(void *p_cds_gctx,
-			uint32_t targetChannel, enum phy_ch_width target_bw);
+	uint32_t targetChannel, enum phy_ch_width target_bw, bool strict);
 QDF_STATUS wlansap_set_key_sta(void *p_cds_gctx,
 	tCsrRoamSetKey *pSetKeyInfo);
 QDF_STATUS wlansap_get_assoc_stations(void *p_cds_gctx,

@@ -402,10 +402,6 @@ char *lim_msg_str(uint32_t msgType)
 		return "WNI_CFG_DNLD_RSP";
 	case WNI_CFG_GET_REQ:
 		return "WNI_CFG_GET_REQ";
-	case WNI_CFG_SET_REQ:
-		return "WNI_CFG_SET_REQ";
-	case WNI_CFG_SET_REQ_NO_RSP:
-		return "WNI_CFG_SET_REQ_NO_RSP";
 	case eWNI_PMC_ENTER_IMPS_RSP:
 		return "eWNI_PMC_ENTER_IMPS_RSP";
 	case eWNI_PMC_EXIT_IMPS_RSP:
@@ -4611,6 +4607,11 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 		return;
 	}
 
+	if (psessionEntry->ch_switch_in_progress == true) {
+		pe_debug("ch switch is in progress, ignore HT IE BW update");
+		return;
+	}
+
 	if (!pHTInfo->primaryChannel) {
 		pe_debug("Ignore as primary channel is 0 in HT info");
 		return;
@@ -6616,8 +6617,14 @@ static QDF_STATUS lim_send_ie(tpAniSirGlobal mac_ctx, uint32_t sme_session_id,
  *
  * Return: true if enabled and false otherwise
  */
-static inline bool lim_get_rx_ldpc(tpAniSirGlobal mac_ctx, uint8_t ch)
+static inline bool lim_get_rx_ldpc(tpAniSirGlobal mac_ctx, enum channel_enum ch)
 {
+	if (ch >= NUM_CHANNELS) {
+		lim_log(mac_ctx, LOGE,
+			FL("invalid number of channels, disable rx ldpc"));
+		return false;
+	}
+
 	if (mac_ctx->roam.configParam.rxLdpcEnable &&
 		wma_is_rx_ldpc_supported_for_channel(CDS_CHANNEL_NUM(ch)))
 		return true;
@@ -7520,9 +7527,9 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 
 	hdr = WMA_GET_RX_MAC_HEADER(rxpktinfor);
 	if (hdr->fc.type == SIR_MAC_MGMT_FRAME) {
-		pe_debug("RxBd: %p mHdr: %p Type: %d Subtype: %d  SizesFC: %zu",
-		  rxpktinfor, hdr, hdr->fc.type, hdr->fc.subType,
-		  sizeof(tSirMacFrameCtl));
+		pe_debug("RxBd: %pK mHdr: %pK Type: %d Subtype: %d SizeFC: %zu",
+				rxpktinfor, hdr, hdr->fc.type, hdr->fc.subType,
+				sizeof(tSirMacFrameCtl));
 		*type = hdr->fc.type;
 		*subtype = hdr->fc.subType;
 	} else {
@@ -7530,4 +7537,65 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 		return QDF_STATUS_E_INVAL;
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+uint8_t lim_get_min_session_txrate(tpPESession session)
+{
+	enum rateid rid = RATEID_DEFAULT;
+	uint8_t min_rate = SIR_MAC_RATE_54, curr_rate, i;
+	tSirMacRateSet *rateset = &session->rateSet;
+
+	if (!session)
+		return rid;
+
+	for (i = 0; i < rateset->numRates; i++) {
+		/* Ignore MSB - set to indicate basic rate */
+		curr_rate = rateset->rate[i] & 0x7F;
+		min_rate =  (curr_rate < min_rate) ? curr_rate : min_rate;
+	}
+	pe_debug("supported min_rate: %0x(%d)", min_rate, min_rate);
+
+	switch (min_rate) {
+	case SIR_MAC_RATE_1:
+		rid = RATEID_1MBPS;
+		break;
+	case SIR_MAC_RATE_2:
+		rid = RATEID_2MBPS;
+		break;
+	case SIR_MAC_RATE_5_5:
+		rid = RATEID_5_5MBPS;
+		break;
+	case SIR_MAC_RATE_11:
+		rid = RATEID_11MBPS;
+		break;
+	case SIR_MAC_RATE_6:
+		rid = RATEID_6MBPS;
+		break;
+	case SIR_MAC_RATE_9:
+		rid = RATEID_9MBPS;
+		break;
+	case SIR_MAC_RATE_12:
+		rid = RATEID_12MBPS;
+		break;
+	case SIR_MAC_RATE_18:
+		rid = RATEID_18MBPS;
+		break;
+	case SIR_MAC_RATE_24:
+		rid = RATEID_24MBPS;
+		break;
+	case SIR_MAC_RATE_36:
+		rid = RATEID_36MBPS;
+		break;
+	case SIR_MAC_RATE_48:
+		rid = RATEID_48MBPS;
+		break;
+	case SIR_MAC_RATE_54:
+		rid = RATEID_54MBPS;
+		break;
+	default:
+		rid = RATEID_DEFAULT;
+		break;
+	}
+
+	return rid;
 }

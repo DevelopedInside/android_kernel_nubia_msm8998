@@ -810,6 +810,12 @@ lim_fill_assoc_ind_params(tpAniSirGlobal mac_ctx,
 		sizeof(tSirSmeChanInfo));
 	/* Fill in WmmInfo */
 	sme_assoc_ind->wmmEnabledSta = assoc_ind->WmmStaInfoPresent;
+	sme_assoc_ind->ch_width = assoc_ind->ch_width;
+	sme_assoc_ind->mode = assoc_ind->mode;
+	if (assoc_ind->HTCaps.present)
+		sme_assoc_ind->HTCaps = assoc_ind->HTCaps;
+	if (assoc_ind->VHTCaps.present)
+		sme_assoc_ind->VHTCaps = assoc_ind->VHTCaps;
 }
 
 /**
@@ -3193,6 +3199,7 @@ void lim_process_switch_channel_rsp(tpAniSirGlobal pMac, void *body)
 			FL("session does not exist for given sessionId"));
 		return;
 	}
+	psessionEntry->ch_switch_in_progress = false;
 	/* HAL fills in the tx power used for mgmt frames in this field. */
 	/* Store this value to use in TPC report IE. */
 	rrm_cache_mgmt_tx_power(pMac, pChnlParams->txMgmtPower, psessionEntry);

@@ -1925,6 +1925,15 @@ lim_roam_fill_bss_descr(tpAniSirGlobal pMac,
 	bss_desc_ptr->timeStamp[1]   = parsed_frm_ptr->timeStamp[1];
 	qdf_mem_copy(&bss_desc_ptr->capabilityInfo,
 	&bcn_proberesp_ptr[SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_CAPAB_OFFSET], 2);
+
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)mac_hdr->bssId)) {
+		pe_debug("bssid is 0 in beacon/probe update it with bssId %pM in sync ind",
+			roam_offload_synch_ind_ptr->bssid.bytes);
+		qdf_mem_copy(mac_hdr->bssId,
+			roam_offload_synch_ind_ptr->bssid.bytes,
+			sizeof(tSirMacAddr));
+	}
+
 	qdf_mem_copy((uint8_t *) &bss_desc_ptr->bssId,
 			(uint8_t *) mac_hdr->bssId,
 			sizeof(tSirMacAddr));
@@ -2067,6 +2076,8 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 		ft_session_ptr->bRoamSynchInProgress = false;
 		return status;
 	}
+
+	add_bss_params->bssIdx = roam_sync_ind_ptr->roamedVdevId;
 	ft_session_ptr->bssIdx = (uint8_t) add_bss_params->bssIdx;
 
 	curr_sta_ds->bssId = add_bss_params->bssIdx;

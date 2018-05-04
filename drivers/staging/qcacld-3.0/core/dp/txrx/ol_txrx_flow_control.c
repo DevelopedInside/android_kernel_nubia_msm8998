@@ -237,7 +237,7 @@ QDF_STATUS ol_tx_inc_pool_ref(struct ol_tx_flow_pool_t *pool)
 	qdf_atomic_inc(&pool->ref_cnt);
 	qdf_spin_unlock_bh(&pool->flow_pool_lock);
 	TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			"%s: pool %p, ref_cnt %x", __func__,
+			"%s: pool %pK, ref_cnt %x", __func__,
 			pool, qdf_atomic_read(&pool->ref_cnt));
 
 	return  QDF_STATUS_SUCCESS;
@@ -269,13 +269,13 @@ QDF_STATUS ol_tx_dec_pool_ref(struct ol_tx_flow_pool_t *pool, bool force)
 			     flow_pool_list_elem);
 		qdf_spin_unlock_bh(&pdev->tx_desc.flow_pool_list_lock);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			"%s: Deleting pool %p", __func__, pool);
+			"%s: Deleting pool %pK", __func__, pool);
 		ol_tx_delete_flow_pool(pool, force);
 	} else {
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
 		qdf_spin_unlock_bh(&pdev->tx_desc.flow_pool_list_lock);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			"%s: pool %p, ref_cnt %x",
+			"%s: pool %pK, ref_cnt %x",
 			__func__, pool, qdf_atomic_read(&pool->ref_cnt));
 	}
 
@@ -523,6 +523,7 @@ struct ol_tx_flow_pool_t *ol_tx_create_flow_pool(uint8_t flow_pool_id,
 	pool->status = FLOW_POOL_ACTIVE_UNPAUSED;
 	pool->start_th = (start_threshold * flow_pool_size)/100;
 	pool->stop_th = (stop_threshold * flow_pool_size)/100;
+	pool->stop_priority_th = (TX_STOP_PRIORITY_TH * pool->stop_th)/100;
 	qdf_spinlock_create(&pool->flow_pool_lock);
 	qdf_atomic_init(&pool->ref_cnt);
 	ol_tx_inc_pool_ref(pool);

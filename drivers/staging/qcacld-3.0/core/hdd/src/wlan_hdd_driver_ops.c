@@ -120,6 +120,17 @@ static bool hdd_is_recovery_in_progress(void *data)
 }
 
 /**
+ * hdd_is_target_ready() - API to query if target is in ready state
+ * @data: Private Data
+ *
+ * Return: bool
+ */
+static bool hdd_is_target_ready(void *data)
+{
+	return cds_is_target_ready();
+}
+
+/**
  * hdd_hif_init_driver_state_callbacks() - API to initialize HIF callbacks
  * @data: Private Data
  * @cbk: HIF Driver State callbacks
@@ -137,6 +148,7 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_recovery_in_progress = hdd_is_recovery_in_progress;
 	cbk->is_load_unload_in_progress = hdd_is_load_or_unload_in_progress;
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
+	cbk->is_target_ready = hdd_is_target_ready;
 }
 
 /**
@@ -246,6 +258,9 @@ int hdd_hif_open(struct device *dev, void *bdev, const hif_bus_id *bid,
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("hif_enable error = %d, reinit = %d",
 			status, reinit);
+		if (!cds_is_fw_down())
+			QDF_BUG(0);
+
 		ret = qdf_status_to_os_return(status);
 		goto err_hif_close;
 	} else {
@@ -374,6 +389,7 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const hif_bus_id *bid,
 
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 	hdd_remove_pm_qos(dev);
+	cds_clear_fw_state(CDS_FW_STATE_DOWN);
 
 	mutex_unlock(&hdd_init_deinit_lock);
 	return 0;
@@ -386,6 +402,7 @@ err_hdd_deinit:
 		cds_set_load_in_progress(false);
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 	hdd_remove_pm_qos(dev);
+	cds_clear_fw_state(CDS_FW_STATE_DOWN);
 	mutex_unlock(&hdd_init_deinit_lock);
 	return ret;
 }
@@ -454,6 +471,24 @@ static inline void hdd_wlan_ssr_shutdown_event(void)
 #endif
 
 /**
+ * hdd_send_hang_reason() - Send hang reason to the userspace
+ *
+ * Return: None
+ */
+static void hdd_send_hang_reason(void)
+{
+	enum cds_hang_reason reason = CDS_REASON_UNSPECIFIED;
+	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	cds_get_recovery_reason(&reason);
+	cds_reset_recovery_reason();
+	wlan_hdd_send_hang_reason_event(hdd_ctx, reason);
+}
+
+/**
  * wlan_hdd_shutdown() - wlan_hdd_shutdown
  *
  * This is routine is called by platform driver to shutdown the
@@ -478,6 +513,7 @@ static void wlan_hdd_shutdown(void)
 	/* this is for cases, where shutdown invoked from platform */
 	cds_set_recovery_in_progress(true);
 	hdd_wlan_ssr_shutdown_event();
+	hdd_send_hang_reason();
 
 	if (!cds_wait_for_external_threads_completion(__func__))
 		hdd_err("Host is not ready for SSR, attempting anyway");
@@ -522,18 +558,6 @@ static void wlan_hdd_notify_handler(int state)
 		if (ret < 0)
 			hdd_err("Fail to send notify");
 	}
-}
-
-/**
- * wlan_hdd_update_status() - update driver status
- * @status: driver status
- *
- * Return: void
- */
-static void wlan_hdd_update_status(uint32_t status)
-{
-	if (status == PLD_RECOVERY)
-		cds_set_recovery_in_progress(true);
 }
 
 /**
@@ -1206,16 +1230,59 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 	wlan_hdd_notify_handler(state);
 }
 
+static void wlan_hdd_purge_notifier(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	ENTER();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd context is NULL return!!");
+		return;
+	}
+
+	mutex_lock(&hdd_ctx->iface_change_lock);
+	if (QDF_TIMER_STATE_RUNNING ==
+		qdf_mc_timer_get_current_state(&hdd_ctx->iface_change_timer)) {
+		qdf_mc_timer_stop(&hdd_ctx->iface_change_timer);
+	}
+	cds_shutdown_notifier_call();
+	cds_shutdown_notifier_purge();
+	mutex_unlock(&hdd_ctx->iface_change_lock);
+
+	EXIT();
+}
+
 /**
- * wlan_hdd_pld_update_status() - update driver status
+ * wlan_hdd_pld_uevent() - update driver status
  * @dev: device
- * @status: driver status
+ * @uevent: uevent status
  *
  * Return: void
  */
-static void wlan_hdd_pld_update_status(struct device *dev, uint32_t status)
+static void wlan_hdd_pld_uevent(struct device *dev,
+				struct pld_uevent_data *uevent)
 {
-	wlan_hdd_update_status(status);
+	ENTER();
+
+	switch (uevent->uevent) {
+	case PLD_RECOVERY:
+		cds_set_recovery_in_progress(true);
+		wlan_hdd_purge_notifier();
+		break;
+	case PLD_FW_DOWN:
+		cds_set_fw_state(CDS_FW_STATE_DOWN);
+		cds_set_target_ready(false);
+		wlan_hdd_purge_notifier();
+		break;
+	case PLD_FW_READY:
+		cds_set_target_ready(true);
+		break;
+	}
+
+	EXIT();
+	return;
 }
 
 #ifdef FEATURE_RUNTIME_PM
@@ -1258,7 +1325,7 @@ struct pld_driver_ops wlan_drv_ops = {
 	.resume_noirq  = wlan_hdd_pld_resume_noirq,
 	.reset_resume = wlan_hdd_pld_reset_resume,
 	.modem_status = wlan_hdd_pld_notify_handler,
-	.update_status = wlan_hdd_pld_update_status,
+	.uevent = wlan_hdd_pld_uevent,
 #ifdef FEATURE_RUNTIME_PM
 	.runtime_suspend = wlan_hdd_pld_runtime_suspend,
 	.runtime_resume = wlan_hdd_pld_runtime_resume,

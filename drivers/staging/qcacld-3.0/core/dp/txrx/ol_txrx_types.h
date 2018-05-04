@@ -410,6 +410,14 @@ enum throttle_phase {
 
 #define THROTTLE_TX_THRESHOLD (100)
 
+/*
+ * Threshold to stop priority queue in percentage. When no
+ * of available descriptors falls below TX_STOP_PRIORITY_TH,
+ * priority queue will be paused.
+ */
+#define TX_STOP_PRIORITY_TH   (80)
+
+
 typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg, void *osif_ctxt);
 
 struct ol_tx_queue_group_t {
@@ -476,6 +484,7 @@ struct ol_txrx_pool_stats {
  * @freelist: tx descriptor freelist
  * @pkt_drop_no_desc: drop due to no descriptors
  * @ref_cnt: pool's ref count
+ * @stop_priority_th: Threshold to stop priority queue
  */
 struct ol_tx_flow_pool_t {
 	TAILQ_ENTRY(ol_tx_flow_pool_t) flow_pool_list_elem;
@@ -492,6 +501,7 @@ struct ol_tx_flow_pool_t {
 	union ol_tx_desc_list_elem_t *freelist;
 	uint16_t pkt_drop_no_desc;
 	qdf_atomic_t ref_cnt;
+	uint16_t stop_priority_th;
 };
 
 #endif
@@ -509,6 +519,17 @@ struct ol_txrx_peer_id_map {
 	struct ol_txrx_peer_t *peer;
 	qdf_atomic_t peer_id_ref_cnt;
 	qdf_atomic_t del_peer_id_ref_cnt;
+};
+
+/**
+ * ol_txrx_stats_req_internal - specifications of the requested
+ * statistics internally
+ */
+struct ol_txrx_stats_req_internal {
+    struct ol_txrx_stats_req base;
+    TAILQ_ENTRY(ol_txrx_stats_req_internal) req_list_elem;
+    int serviced; /* state of this request */
+    int offset;
 };
 
 /*
@@ -628,6 +649,10 @@ struct ol_txrx_pdev_t {
 	/* ol_txrx_vdev list */
 	TAILQ_HEAD(, ol_txrx_vdev_t) vdev_list;
 
+	TAILQ_HEAD(, ol_txrx_stats_req_internal) req_list;
+	int req_list_depth;
+	qdf_spinlock_t req_list_spinlock;
+
 	/* peer ID to peer object map (array of pointers to peer objects) */
 	struct ol_txrx_peer_id_map *peer_id_to_obj_map;
 
@@ -675,6 +700,7 @@ struct ol_txrx_pdev_t {
 		} callbacks[OL_TXRX_MGMT_NUM_TYPES];
 	} tx_mgmt;
 
+	data_stall_detect_cb data_stall_detect_callback;
 	/* packetdump callback functions */
 	tp_ol_packetdump_cb ol_tx_packetdump_cb;
 	tp_ol_packetdump_cb ol_rx_packetdump_cb;
