@@ -1165,7 +1165,7 @@ static ssize_t show_boost(struct cpufreq_interactive_tunables *tunables,
 static ssize_t store_boost(struct cpufreq_interactive_tunables *tunables,
 			   const char *buf, size_t count)
 {
-	int ret;
+	/* int ret;
 	unsigned long val;
 
 	ret = kstrtoul(buf, 0, &val);
@@ -1181,7 +1181,7 @@ static ssize_t store_boost(struct cpufreq_interactive_tunables *tunables,
 	} else {
 		tunables->boostpulse_endtime = ktime_to_us(ktime_get());
 		trace_cpufreq_interactive_unboost("off");
-	}
+	} */
 
 	return count;
 }
@@ -1577,6 +1577,12 @@ static struct cpufreq_interactive_tunables *alloc_tunable(
 	tunables->timer_rate = DEFAULT_TIMER_RATE;
 	tunables->boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
+	tunables->use_sched_load = true;
+	tunables->use_migration_notif = true;
+	tunables->hispeed_freq = 1248000;
+	tunables->io_is_busy = true;
+	tunables->max_freq_hysteresis = 79000;
+	tunables->ignore_hispeed_on_notif = true;
 
 	spin_lock_init(&tunables->target_loads_lock);
 	spin_lock_init(&tunables->above_hispeed_delay_lock);

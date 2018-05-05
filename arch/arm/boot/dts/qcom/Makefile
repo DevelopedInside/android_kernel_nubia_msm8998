@@ -248,7 +248,9 @@ dtb-$(CONFIG_ARCH_SDM630) += sdm630-rumi.dtb \
 
 ifeq ($(CONFIG_ARM64),y)
 #always          := $(dtb-y)
-always          := $(ZTEMT_DTS_NAME)
+always          += msm8998-v2.1-mtp-NX563J.dtb \
+                msm8998-v2-mtp-NX563J.dtb \
+                msm8998-mtp-NX563J.dtb
 subdir-y        := $(dts-dirs)
 else
 targets += dtbs

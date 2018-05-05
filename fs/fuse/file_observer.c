@@ -19,7 +19,7 @@
 #include <linux/mm.h>
 #include <linux/list.h>
 #include <linux/mount.h>
-#include <../mount.h>
+#include "../mount.h"
 #include <linux/mtd/mtd.h>
 #include "fuse_i.h"
 #include "linux/jiffies.h"

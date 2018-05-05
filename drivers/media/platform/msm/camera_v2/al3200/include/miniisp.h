@@ -19,7 +19,7 @@
 #include <linux/spi/spi.h>
 #include <linux/types.h>
 
-#include "include/mtype.h"
+#include "mtype.h"
 
 /******Public Constant Definition******/
 
