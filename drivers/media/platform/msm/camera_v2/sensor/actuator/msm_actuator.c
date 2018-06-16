@@ -644,10 +644,6 @@ static int32_t msm_actuator_move_focus(
     }
     if (a_ctrl->i2c_reg_tbl == NULL) {
         pr_err("failed. i2c reg tabl is NULL");
-        //ZTEMT:jixd 20170313 add for af performance ---start
-        preempt_enable();
-        kfree(ringing_params_kernel);
-        //ZTEMT:jixd 20170313 add for af performance ---end    
         return -EFAULT;
     }
     if (dest_step_pos > a_ctrl->total_steps) {
