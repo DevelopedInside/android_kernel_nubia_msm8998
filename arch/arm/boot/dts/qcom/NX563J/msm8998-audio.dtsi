@@ -65,6 +65,8 @@
 			"MIC BIAS1", "Secondary Mic",
 			"AMIC6", "MIC BIAS3",
 			"MIC BIAS3", "Handset Mic",
+			"AMIC6", "MIC BIAS4",
+			"MIC BIAS4", "Analog Mic6",
 			"DMIC0", "MIC BIAS1",
 			"MIC BIAS1", "Digital Mic0",
 			"DMIC1", "MIC BIAS1",
@@ -298,7 +300,7 @@
 	qcom,wcd-dsp-mgr {
 		compatible = "qcom,wcd-dsp-mgr";
 		qcom,wdsp-components = <&wcd934x_cdc 0>,
-				       //<&wcd_spi_0 1>,
+				       <&wcd_spi_0 1>,
 				       <&glink_spi_xprt_wdsp 2>;
 		qcom,img-filename = "cpe_9340";
 	};

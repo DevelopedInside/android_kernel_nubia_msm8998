@@ -362,7 +362,7 @@
 			qcom,fg-recharge-soc-thr = <99>;
 			qcom,fg-recharge-voltage = <4340>;
 			qcom,battery-thermal-coefficients = [bd 50 ff];
-			qcom,fg-jeita-thresholds = <0 10 43 50>;
+			qcom,fg-jeita-thresholds = <0 10 44 50>;
 			qcom,fg-jeita-hyst-temp = <2>;
 			qcom,fg-chg-term-current = <200>;
 			qcom,fg-sys-term-current = <(-250)>;
@@ -575,7 +575,7 @@
 			red_led: qcom,rgb_0 {
 				label = "rgb";
 				qcom,id = <3>;
-				qcom,mode = "lpg";
+				qcom,mode = "pwm";
 				pwms = <&pmi8998_pwm_5 0 0>;
 				qcom,pwm-us = <1000>;
 				qcom,start-idx = <0>;
@@ -629,7 +629,7 @@
 			blue_led: qcom,rgb_2 {
 				label = "rgb";
 				qcom,id = <5>;
-				qcom,mode = "lpg";
+				qcom,mode = "pwm";
 				pwms = <&pmi8998_pwm_3 0 0>;
 				qcom,pwm-us = <1000>;
 				qcom,start-idx = <0>;
