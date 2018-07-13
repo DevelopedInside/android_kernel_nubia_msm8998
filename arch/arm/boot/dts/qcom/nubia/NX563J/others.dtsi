@@ -88,6 +88,10 @@
 	qcom,led-strings-list = [00 01];
 };
 
+&pmi8998_haptics {
+	status = "disabled";
+};
+
 /*
 &firmware{
 	android{
