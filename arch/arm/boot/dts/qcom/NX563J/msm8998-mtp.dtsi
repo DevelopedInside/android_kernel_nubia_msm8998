@@ -625,7 +625,7 @@
 };
 
 &pmi8998_haptics {
-	status = "okay";
+	//status = "okay";
 };
 
 &pm8998_vadc {
