@@ -182,4 +182,16 @@ config ARCH_ZYNQMP
 	help
 	  This enables support for Xilinx ZynqMP Family
 
+config ZTE_NX563J
+    depends on ARCH_MSM8998
+    bool "Adds support for Nubia ZTE_NX563J"
+
+config ZTE_NX595J
+    depends on ARCH_MSM8998
+    bool "Adds support for Nubia ZTE_NX595J"
+
+config ZTE_NX609J
+    depends on ARCH_MSM8998
+    bool "Adds support for Nubia ZTE_NX609J"
+
 endmenu
