@@ -26,6 +26,8 @@
 #include <asm/atomic.h>
 #include "diagfwd_bridge.h"
 
+#define THRESHOLD_CLIENT_LIMIT	50
+
 /* Size of the USB buffers used for read and write*/
 #define USB_MAX_OUT_BUF 4096
 #define APPS_BUF_SIZE	4096
@@ -508,6 +510,7 @@ struct diagchar_dev {
 	wait_queue_head_t wait_q;
 	struct diag_client_map *client_map;
 	int *data_ready;
+	atomic_t data_ready_notif[THRESHOLD_CLIENT_LIMIT];
 	int num_clients;
 	int polling_reg_flag;
 	int use_device_tree;
@@ -680,5 +683,6 @@ void diag_record_stats(int type, int flag);
 
 struct diag_md_session_t *diag_md_session_get_pid(int pid);
 struct diag_md_session_t *diag_md_session_get_peripheral(uint8_t peripheral);
-
+int nubia_diag_get_ftm_type(struct diag_cmd_reg_entry_t *entry);
+int nubia_diag_get_ftm_type_reg(struct diag_cmd_reg_entry_t *entry);
 #endif

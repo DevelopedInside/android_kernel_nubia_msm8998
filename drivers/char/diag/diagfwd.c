@@ -226,6 +226,7 @@ void chk_logging_wakeup(void)
 			 * situation.
 			 */
 			driver->data_ready[i] |= USER_SPACE_DATA_TYPE;
+			atomic_inc(&driver->data_ready_notif[i]);
 			pr_debug("diag: Force wakeup of logging process\n");
 			wake_up_interruptible(&driver->wait_q);
 			break;
@@ -480,8 +481,11 @@ void diag_update_userspace_clients(unsigned int type)
 
 	mutex_lock(&driver->diagchar_mutex);
 	for (i = 0; i < driver->num_clients; i++)
-		if (driver->client_map[i].pid != 0)
+		if (driver->client_map[i].pid != 0 &&
+			!(driver->data_ready[i] & type)) {
 			driver->data_ready[i] |= type;
+			atomic_inc(&driver->data_ready_notif[i]);
+		}
 	wake_up_interruptible(&driver->wait_q);
 	mutex_unlock(&driver->diagchar_mutex);
 }
@@ -497,7 +501,11 @@ void diag_update_md_clients(unsigned int type)
 				if (driver->client_map[j].pid != 0 &&
 					driver->client_map[j].pid ==
 					driver->md_session_map[i]->pid) {
-					driver->data_ready[j] |= type;
+					if (!(driver->data_ready[i] & type)) {
+						driver->data_ready[j] |= type;
+						atomic_inc(
+						&driver->data_ready_notif[j]);
+					}
 					break;
 				}
 			}
@@ -512,7 +520,10 @@ void diag_update_sleeping_process(int process_id, int data_type)
 	mutex_lock(&driver->diagchar_mutex);
 	for (i = 0; i < driver->num_clients; i++)
 		if (driver->client_map[i].pid == process_id) {
-			driver->data_ready[i] |= data_type;
+			if (!(driver->data_ready[i] & data_type)) {
+				driver->data_ready[i] |= data_type;
+				atomic_inc(&driver->data_ready_notif[i]);
+			}
 			break;
 		}
 	wake_up_interruptible(&driver->wait_q);
@@ -922,6 +933,7 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 	struct diag_cmd_reg_entry_t entry;
 	struct diag_cmd_reg_entry_t *temp_entry = NULL;
 	struct diag_cmd_reg_t *reg_item = NULL;
+       int ntype = 0;
 
 	if (!buf)
 		return -EIO;
@@ -944,7 +956,10 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 
 	pr_debug("diag: In %s, received cmd %02x %02x %02x\n",
 		 __func__, entry.cmd_code, entry.subsys_id, entry.cmd_code_hi);
-
+       ntype = nubia_diag_get_ftm_type(&entry);
+        if(ntype != 0){
+            pr_err("diag: In %s, received FTM debug cmd %s\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
+        }
 	if (*buf == DIAG_CMD_LOG_ON_DMND && driver->log_on_demand_support &&
 	    driver->feature[PERIPHERAL_MODEM].rcvd_feature_mask) {
 		write_len = diag_cmd_log_on_demand(buf, len,
@@ -952,6 +967,9 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 						   DIAG_MAX_RSP_SIZE);
 		if (write_len > 0)
 			diag_send_rsp(driver->apps_rsp_buf, write_len, info);
+                if(ntype != 0){
+                    pr_err("diag: In %s, received FTM debug cmd %s DIAG_CMD_LOG_ON_DMND\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
+                }
 		return 0;
 	}
 
@@ -962,20 +980,40 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 								entry);
 		if (info) {
 			if (MD_PERIPHERAL_MASK(reg_item->proc) &
-				info->peripheral_mask)
+				info->peripheral_mask){
 				write_len = diag_send_data(reg_item, buf, len);
+                            if(ntype != 0){
+                                pr_err("diag: In %s, received FTM debug cmd %s info\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
+                            }
+			    }else{
+                            if(ntype != 0){
+                                pr_err("diag: In %s, received FTM debug cmd %s info ignore\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
+                            }
+                }
 		} else {
 			if (MD_PERIPHERAL_MASK(reg_item->proc) &
-				driver->logging_mask)
+				driver->logging_mask){
+				mutex_unlock(&driver->cmd_reg_mutex);
 				diag_send_error_rsp(buf, len, info);
-			else
+                            if(ntype != 0){
+                                pr_err("diag: In %s, received FTM debug cmd %s no info error reg_item->proc %d driver->logging_mask %d\n", __func__, (ntype == 1) ? " wireless " : " wifi ", reg_item->proc, driver->logging_mask);
+                            }
+        return write_len;
+			    }
+			else{
 				write_len = diag_send_data(reg_item, buf, len);
+                            if(ntype != 0){
+                                pr_err("diag: In %s, received FTM debug cmd %s no info success reg_item->proc %d driver->logging_mask %d\n", __func__, (ntype == 1) ? " wireless " : " wifi ", reg_item->proc, driver->logging_mask);
+                            }
+			    }
 		}
 		mutex_unlock(&driver->cmd_reg_mutex);
 		return write_len;
 	}
 	mutex_unlock(&driver->cmd_reg_mutex);
-
+        if(ntype != 0){
+            pr_err("diag: In %s, received FTM debug cmd %s maybe error\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
+        }
 #if defined(CONFIG_DIAG_OVER_USB)
 	/* Check for the command/respond msg for the maximum packet length */
 	if ((*buf == 0x4b) && (*(buf+1) == 0x12) &&
@@ -1029,6 +1067,20 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 		/* Not required, represents that command isnt sent to modem */
 		return 0;
 	}
+#ifdef CONFIG_NUBIA_DIAG_REBOOT_CMD
+    	/* Check for reboot command */
+	else if (chk_apps_master() && (*buf == 0x29) && (*(buf+1) == 0x02) && (*(buf+2) == 0x00)) {
+		/* send response back */
+		//driver->apps_rsp_buf[0] = *buf;
+		memcpy(driver->apps_rsp_buf,buf,3);
+		diag_send_rsp(driver->apps_rsp_buf, 1, info);
+		msleep(5000);
+		printk(KERN_CRIT "diag: reboot set, Rebooting SoC..\n");
+		kernel_restart(NULL);
+		/* Not required, represents that command isnt sent to modem */
+		return 0;
+	}
+#endif
 	/* Check for polling for Apps only DIAG */
 	else if ((*buf == 0x4b) && (*(buf+1) == 0x32) &&
 		(*(buf+2) == 0x03)) {
@@ -1138,7 +1190,9 @@ int diag_process_apps_pkt(unsigned char *buf, int len,
 		return 0;
 	}
 #endif
-
+        if(ntype != 0){
+            pr_err("diag: In %s, received FTM debug cmd %s error\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
+        }
 	/* We have now come to the end of the function. */
 	if (chk_apps_only())
 		diag_send_error_rsp(buf, len, info);
@@ -1703,6 +1757,8 @@ int diagfwd_init(void)
 							, GFP_KERNEL)) == NULL)
 		goto err;
 	kmemleak_not_leak(driver->data_ready);
+	for (i = 0; i < THRESHOLD_CLIENT_LIMIT; i++)
+		atomic_set(&driver->data_ready_notif[i], 0);
 	if (driver->apps_req_buf == NULL) {
 		driver->apps_req_buf = kzalloc(DIAG_MAX_REQ_SIZE, GFP_KERNEL);
 		if (!driver->apps_req_buf)
@@ -1763,3 +1819,27 @@ void diagfwd_exit(void)
 	kfree(driver->user_space_data_buf);
 	destroy_workqueue(driver->diag_wq);
 }
+
+#define NUBIA_DIAG_FTM_NONE_TYPE 0
+#define NUBIA_DIAG_FTM_WIRELESS_TYPE 1
+#define NUBIA_DIAG_FTM_WIFI_TYPE 2
+int nubia_diag_get_ftm_type(struct diag_cmd_reg_entry_t *entry){
+    int type = NUBIA_DIAG_FTM_NONE_TYPE;
+    if((entry->cmd_code == 0x4b && entry->subsys_id == 0xfa && entry->cmd_code_hi == 0x06)){
+        type = NUBIA_DIAG_FTM_WIRELESS_TYPE;
+    }else if((entry->cmd_code == 0x4b && entry->subsys_id ==0x0b && entry->cmd_code_hi == 0x16)){
+        type = NUBIA_DIAG_FTM_WIFI_TYPE;
+    }
+    return type;
+}
+
+int nubia_diag_get_ftm_type_reg(struct diag_cmd_reg_entry_t *entry){
+    int type = NUBIA_DIAG_FTM_NONE_TYPE;
+    if((entry->cmd_code == 0xff && entry->subsys_id == 0xfa && entry->cmd_code_hi == 0x06)){
+        type = NUBIA_DIAG_FTM_WIRELESS_TYPE;
+    }else if((entry->cmd_code == 0xff && entry->subsys_id ==0x0b && entry->cmd_code_hi == 0x16)){
+        type = NUBIA_DIAG_FTM_WIFI_TYPE;
+    }
+    return type;
+}
+
