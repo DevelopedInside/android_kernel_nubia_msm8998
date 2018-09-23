@@ -1,0 +1,81 @@
+/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+qcom,scud_3200mah_step {
+	qcom,max-voltage-uv = <4400000>;
+	qcom,fg-cc-cv-threshold-mv = <4385>;
+	qcom,nom-batt-capacity-mah = <3200>;
+	qcom,fastchg-current-ma = <2150>;
+	qcom,batt-id-kohm = <47>;
+	qcom,battery-beta = <3800>;
+	qcom,battery-type = "scud_3200mah_step";
+	qcom,checksum = <0xCAFB>;
+	qcom,gui-version = "PMI8998GUI - 2.0.0.58";
+	qcom,fg-profile-data = [
+		 D1 1F 64 05
+		 77 0A FB FC
+		 EF 1C B9 01
+		 E9 04 B4 02
+		 2D 14 CC 2A
+		 BE 4D 73 5A
+		 65 00 00 00
+		 0E 00 00 00
+		 00 00 30 C4
+		 CA CC 58 CB
+		 31 00 08 00
+		 81 E3 A8 07
+		 33 F4 3A E2
+		 0A 0B 45 13
+		 DA 05 9C 3A
+		 16 06 09 20
+		 27 00 14 00
+		 BF 1E A6 06
+		 35 03 EE F4
+		 E0 1C B3 02
+		 93 0C 64 0B
+		 07 16 87 2A
+		 B8 4D C5 5A
+		 77 00 00 00
+		 0D 00 00 00
+		 00 00 92 C5
+		 D1 BA 5B CC
+		 2B 00 00 00
+		 C1 EB A8 07
+		 DB F4 04 D3
+		 0E 0A 2B 12
+		 1A 0A 0D 22
+		 BA 33 CC FF
+		 07 10 00 00
+		 9D 0C 66 46
+		 2B 00 40 00
+		 24 01 0A FA
+		 FF 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+	];
+};

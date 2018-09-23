@@ -1,0 +1,109 @@
+/*
+ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	wp502x-charger {
+		compatible = "wp502x,charger";
+		wp502x,fastchg-irq-gpio = <&pmi8998_gpios 3 0x00>;
+		wp502x,fastchg-en-gpio = <&pmi8998_gpios 6 0x00>;
+		wp502x,i2c-sda-gpio = <&pmi8998_gpios 11 0x00>;
+		wp502x,i2c-scl-gpio = <&pmi8998_gpios 1 0x00>;
+		wp502x,idetify-threshold = <85>;
+		wp502x,support-current-threshold = <(-1200)>;
+		wp502x,bat-temp-limit-threshold = <400>;
+		wp502x,bat-clod-limit-threshold = <100>;
+		wp502x,bat-cool-limit-threshold = <150>;
+		wp502x,bat-hot-limit-threshold = <440>;
+		wp502x,fastchg-max-ma = <5000>;
+		wp502x,vref1p8-en-gpio = <&tlmm 51 0>;
+	};
+};
+
+&i2c_7 {
+	bq27520@5a{
+		compatible = "ti,bq27520";
+		reg = <0x55>;
+		ti,soc-irq-gpio = <&tlmm 122 0x00>;
+		ti,bat-low-threshold = <3400>;
+		pinctrl-names = "irq_config";
+		pinctrl-0 = <&bq27520_irq_config>;
+	};
+};
+
+&pmi8998_gpios {
+	/* GPIO 3 for direct charger irq signal */
+	gpio@c200 {
+		status = "okay";
+		qcom,mode = <0>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <0>;
+		qcom,master-en = <1>;
+	};
+	/* GPIO 6 for direct charger control signal */
+	gpio@c500 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <1>;
+		qcom,master-en = <1>;
+	};
+	/* GPIO 1 for direct charger i2c scl signal */
+	gpio@c000 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <1>;
+		qcom,master-en = <1>;
+	};
+	/* GPIO 11 for direct charger i2c sda signal */
+	gpio@ca00 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <1>;
+		qcom,master-en = <1>;
+	};
+};
+
+&tlmm {
+	bq27520-gpio-config {
+        bq27520_irq_config: bq27520_irq_config {
+			mux {
+				pins = "gpio122";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio122";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};
