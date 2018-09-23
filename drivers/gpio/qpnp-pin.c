@@ -753,6 +753,51 @@ int qpnp_pin_config(int gpio, struct qpnp_pin_cfg *param)
 }
 EXPORT_SYMBOL(qpnp_pin_config);
 
+#ifdef CONFIG_NUBIA_HW_GPIO_BY_PM
+int nubia_qpnp_pin_config(int gpio, uint32_t pull_v )
+{
+	int rc, chip_offset;
+	struct qpnp_pin_chip *q_chip;
+	struct qpnp_pin_spec *q_spec = NULL;
+	struct gpio_chip *gpio_chip;
+
+	mutex_lock(&qpnp_pin_chips_lock);
+	list_for_each_entry(q_chip, &qpnp_pin_chips, chip_list) {
+		gpio_chip = &q_chip->gpio_chip;
+		if (gpio >= gpio_chip->base
+				&& gpio < gpio_chip->base + gpio_chip->ngpio) {
+			chip_offset = gpio - gpio_chip->base;
+			q_spec = qpnp_chip_gpio_get_spec(q_chip, chip_offset);
+			if (WARN_ON(!q_spec)) {
+				mutex_unlock(&qpnp_pin_chips_lock);
+				return -ENODEV;
+			}
+			break;
+		}
+	}
+	mutex_unlock(&qpnp_pin_chips_lock);
+
+	if (!q_spec)
+		return -ENODEV;
+
+	if (Q_HAVE_HW_SP(Q_PIN_CFG_PULL, q_spec, pull_v))
+	{
+		q_reg_clr_set(&q_spec->regs[Q_REG_I_DIG_PULL_CTL],
+			  Q_REG_PULL_SHIFT, Q_REG_PULL_MASK,
+			  pull_v);
+	}
+	else
+		return -1;
+	
+	rc = spmi_ext_register_writel(q_chip->spmi->ctrl, q_spec->slave,
+			  Q_REG_ADDR(q_spec, Q_REG_DIG_PULL_CTL), &q_spec->regs[Q_REG_I_DIG_PULL_CTL], 1);
+
+	return rc;
+}
+EXPORT_SYMBOL(nubia_qpnp_pin_config);
+#endif
+
+
 int qpnp_pin_map(const char *name, uint32_t pmic_pin)
 {
 	struct qpnp_pin_chip *q_chip;
