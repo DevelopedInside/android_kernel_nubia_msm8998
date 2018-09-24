@@ -26,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/leds-qpnp-wled.h>
 #include <linux/qpnp/qpnp-revid.h>
+#include <linux/regulator/consumer.h>
 
 /* base addresses */
 #define QPNP_WLED_CTRL_BASE		"qpnp-wled-ctrl-base"
@@ -311,6 +312,7 @@ static struct wled_vref_setting vref_setting_pmi8998 = {
 	60000, 397500, 22500, 127500,
 };
 
+static struct regulator *bob_test = NULL;
 /**
  *  qpnp_wled - wed data structure
  *  @ cdev - led class device
@@ -1108,7 +1110,13 @@ static void qpnp_wled_work(struct work_struct *work)
 				goto unlock_mutex;
 			}
 		}
-
+        if (!!level) {
+            rc = regulator_set_voltage(bob_test, 3400000, 3600000); 
+            rc = regulator_disable(bob_test); 
+        } else {
+            rc = regulator_set_voltage(bob_test, 3450000, 3600000); 
+            rc = regulator_enable(bob_test); 
+        }
 		rc = qpnp_wled_module_en(wled, wled->ctrl_base, !!level);
 		if (rc) {
 			dev_err(&wled->pdev->dev, "wled %sable failed\n",
@@ -2721,7 +2729,7 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 			goto sysfs_fail;
 		}
 	}
-
+    bob_test = regulator_get(&pdev->dev, "bob_test");
 	return 0;
 
 sysfs_fail:
