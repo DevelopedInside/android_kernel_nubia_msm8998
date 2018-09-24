@@ -3,6 +3,14 @@
 
 #include "core.h"
 
+#define NUBIA_DEBUG_TRIGGER_SCAN 
+
+#ifdef NUBIA_DEBUG_TRIGGER_SCAN
+#define KLOGE(...) pr_err(__VA_ARGS__)
+#else
+#define KLOGE(...)
+#endif
+
 int nl80211_init(void);
 void nl80211_exit(void);
 void nl80211_notify_wiphy(struct cfg80211_registered_device *rdev,

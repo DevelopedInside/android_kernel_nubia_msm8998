@@ -159,6 +159,7 @@ static int cfg80211_conn_scan(struct wireless_dev *wdev)
 		dev_hold(wdev->netdev);
 	} else {
 		rdev->scan_req = NULL;
+		KLOGE("NL80211: In %s, reset scan_req\n", __func__);
 		kfree(request);
 	}
 	return err;

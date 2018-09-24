@@ -6274,16 +6274,21 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 	int err, tmp, n_ssids = 0, n_channels, i;
 	size_t ie_len;
 
-	if (!is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]))
+       KLOGE("NL80211: In %s, start\n", __func__);
+	if (!is_valid_ie_attr(info->attrs[NL80211_ATTR_IE])){
+		KLOGE("NL80211: In %s, error %d is_valid_ie_attr\n", __func__, EINVAL);
 		return -EINVAL;
-
+	}
 	wiphy = &rdev->wiphy;
 
-	if (!rdev->ops->scan)
+	if (!rdev->ops->scan){
+		KLOGE("NL80211: In %s, error %d rdev->ops->scan \n", __func__, EOPNOTSUPP);
 		return -EOPNOTSUPP;
+	}
 
 	if (rdev->scan_req || rdev->scan_msg) {
 		err = -EBUSY;
+		KLOGE("NL80211: In %s, error %d rdev->scan_req %p rdev->scan_msg %p\n", __func__, err, rdev->scan_req, rdev->scan_msg);
 		goto unlock;
 	}
 
@@ -6292,6 +6297,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 				info->attrs[NL80211_ATTR_SCAN_FREQUENCIES]);
 		if (!n_channels) {
 			err = -EINVAL;
+			KLOGE("NL80211: In %s, error %d n_channels %d \n", __func__, err, n_channels);
 			goto unlock;
 		}
 	} else {
@@ -6304,6 +6310,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 
 	if (n_ssids > wiphy->max_scan_ssids) {
 		err = -EINVAL;
+		KLOGE("NL80211: In %s, error %d n_ssids %d wiphy->max_scan_ssids %d\n", __func__, err, n_ssids, wiphy->max_scan_ssids);
 		goto unlock;
 	}
 
@@ -6314,6 +6321,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 
 	if (ie_len > wiphy->max_scan_ie_len) {
 		err = -EINVAL;
+		KLOGE("NL80211: In %s, error %d ie_len %d wiphy->max_scan_ssids %d\n", __func__, err, (int)ie_len, (int)wiphy->max_scan_ie_len);
 		goto unlock;
 	}
 
@@ -6323,6 +6331,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 			+ ie_len, GFP_KERNEL);
 	if (!request) {
 		err = -ENOMEM;
+		KLOGE("NL80211: In %s, error %d request %p \n", __func__, err, request);
 		goto unlock;
 	}
 
@@ -6346,6 +6355,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 
 			if (!chan) {
 				err = -EINVAL;
+				KLOGE("NL80211: In %s, error %d chan null \n", __func__, err);
 				goto out_free;
 			}
 
@@ -6380,6 +6390,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 
 	if (!i) {
 		err = -EINVAL;
+		KLOGE("NL80211: In %s, error %d i %d \n", __func__, err, i);
 		goto out_free;
 	}
 
@@ -6390,6 +6401,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 		nla_for_each_nested(attr, info->attrs[NL80211_ATTR_SCAN_SSIDS], tmp) {
 			if (nla_len(attr) > IEEE80211_MAX_SSID_LEN) {
 				err = -EINVAL;
+				KLOGE("NL80211: In %s, error %d nla_len(attr) > IEEE80211_MAX_SSID_LEN \n", __func__, err);
 				goto out_free;
 			}
 			request->ssids[i].ssid_len = nla_len(attr);
@@ -6418,6 +6430,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 
 			if (band < 0 || band >= IEEE80211_NUM_BANDS) {
 				err = -EINVAL;
+				KLOGE("NL80211: In %s, error %d band %d \n", __func__, err, band);
 				goto out_free;
 			}
 
@@ -6428,8 +6441,10 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 						     nla_data(attr),
 						     nla_len(attr),
 						     &request->rates[band]);
-			if (err)
+			if (err){
+				KLOGE("NL80211: In %s, error %d ieee80211_get_ratemask \n", __func__, err);
 				goto out_free;
+			    }
 		}
 	}
 
@@ -6439,6 +6454,7 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 		if ((request->flags & NL80211_SCAN_FLAG_LOW_PRIORITY) &&
 		    !(wiphy->features & NL80211_FEATURE_LOW_PRIORITY_SCAN)) {
 			err = -EOPNOTSUPP;
+			KLOGE("NL80211: In %s, error %d NL80211_SCAN_FLAG_LOW_PRIORITY \n", __func__, err);
 			goto out_free;
 		}
 
@@ -6446,19 +6462,23 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 			if (!(wiphy->features &
 					NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR)) {
 				err = -EOPNOTSUPP;
+				KLOGE("NL80211: In %s, error %d !NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR \n", __func__, err);
 				goto out_free;
 			}
 
 			if (wdev->current_bss) {
 				err = -EOPNOTSUPP;
+				KLOGE("NL80211: In %s, error %d NL80211_SCAN_FLAG_RANDOM_ADDR wdev->current_bss not null\n", __func__, err);
 				goto out_free;
 			}
 
 			err = nl80211_parse_random_mac(info->attrs,
 						       request->mac_addr,
 						       request->mac_addr_mask);
-			if (err)
+			if (err){
+				KLOGE("NL80211: In %s, error %d nl80211_parse_random_mac\n", __func__, err);
 				goto out_free;
+			    }
 		}
 	}
 
@@ -6496,12 +6516,15 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 		if (wdev->netdev)
 			dev_hold(wdev->netdev);
 	} else {
+		KLOGE("NL80211: In %s, error %d rdev_scan\n", __func__, err);
  out_free:
 		rdev->scan_req = NULL;
+		KLOGE("NL80211: In %s, reset scan_req\n", __func__);
 		kfree(request);
 	}
 
  unlock:
+	KLOGE("NL80211: In %s, error %d end\n", __func__, err);
 	return err;
 }
 

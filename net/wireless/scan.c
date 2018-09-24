@@ -228,6 +228,7 @@ void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev,
 	if (rdev->scan_msg) {
 		nl80211_send_scan_result(rdev, rdev->scan_msg);
 		rdev->scan_msg = NULL;
+		KLOGE("NL80211: In %s, reset scan_msg\n", __func__);
 		return;
 	}
 
@@ -267,6 +268,7 @@ void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev,
 		dev_put(wdev->netdev);
 
 	rdev->scan_req = NULL;
+	KLOGE("NL80211: In %s, reset scan_req\n", __func__);
 	kfree(request);
 
 	if (!send_message)
@@ -1368,6 +1370,7 @@ int cfg80211_wext_siwscan(struct net_device *dev,
 	err = rdev_scan(rdev, creq);
 	if (err) {
 		rdev->scan_req = NULL;
+		KLOGE("NL80211: In %s, reset scan_req\n", __func__);
 		/* creq will be freed below */
 	} else {
 		nl80211_send_scan_start(rdev, dev->ieee80211_ptr);
