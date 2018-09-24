@@ -26,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/leds-qpnp-wled.h>
 #include <linux/qpnp/qpnp-revid.h>
+#include <linux/regulator/consumer.h>
 
 /* base addresses */
 #define QPNP_WLED_CTRL_BASE		"qpnp-wled-ctrl-base"
@@ -123,6 +124,7 @@
 #define QPNP_WLED_ILIM_FAULT_BIT	BIT(0)
 #define QPNP_WLED_OVP_FAULT_BIT		BIT(1)
 #define QPNP_WLED_SC_FAULT_BIT		BIT(2)
+#define QPNP_WLED_OVP_FLT_RT_STS_BIT	BIT(1)
 
 /* sink registers */
 #define QPNP_WLED_CURR_SINK_REG(b)	(b + 0x46)
@@ -308,6 +310,7 @@ static struct wled_vref_setting vref_setting_pmi8998 = {
 	60000, 397500, 22500, 127500,
 };
 
+static struct regulator *bob_test = NULL;
 /**
  *  qpnp_wled - wed data structure
  *  @ cdev - led class device
@@ -403,6 +406,7 @@ struct qpnp_wled {
 	bool			ovp_irq_disabled;
 	bool			auto_calib_enabled;
 	bool			auto_calib_done;
+	bool			module_dis_perm;
 	ktime_t			start_ovp_fault_time;
 };
 
@@ -537,6 +541,11 @@ static int qpnp_wled_set_level(struct qpnp_wled *wled, int level)
 {
 	int i, rc;
 	u8 reg;
+	u16 low_limit = WLED_MAX_LEVEL_4095 * 4 / 1000;
+
+	/* WLED's lower limit of operation is 0.4% */
+	if (level > 0 && level < low_limit)
+		level = low_limit;
 
 	/* set brightness registers */
 	for (i = 0; i < wled->max_strings; i++) {
@@ -593,6 +602,9 @@ static int qpnp_wled_module_en(struct qpnp_wled *wled,
 				u16 base_addr, bool state)
 {
 	int rc;
+
+	if (wled->module_dis_perm)
+		return 0;
 
 	rc = qpnp_wled_masked_write_reg(wled,
 			QPNP_WLED_MODULE_EN_REG(base_addr),
@@ -960,7 +972,13 @@ static void qpnp_wled_work(struct work_struct *work)
 				goto unlock_mutex;
 			}
 		}
-
+        if (!!level) {
+            rc = regulator_set_voltage(bob_test, 3400000, 3600000); 
+            rc = regulator_disable(bob_test); 
+        } else {
+            rc = regulator_set_voltage(bob_test, 3450000, 3600000); 
+            rc = regulator_enable(bob_test); 
+        }
 		rc = qpnp_wled_module_en(wled, wled->ctrl_base, !!level);
 		if (rc) {
 			dev_err(&wled->pdev->dev, "wled %sable failed\n",
@@ -1092,19 +1110,11 @@ static int qpnp_wled_set_disp(struct qpnp_wled *wled, u16 base_addr)
 	return 0;
 }
 
-#define AUTO_CALIB_BRIGHTNESS		16
+#define AUTO_CALIB_BRIGHTNESS		200
 static int wled_auto_calibrate(struct qpnp_wled *wled)
 {
 	int rc = 0, i;
 	u8 reg = 0, sink_config = 0, sink_test = 0, sink_valid = 0, int_sts;
-
-	mutex_lock(&wled->lock);
-
-	/* disable OVP IRQ */
-	if (wled->ovp_irq > 0 && !wled->ovp_irq_disabled) {
-		disable_irq_nosync(wled->ovp_irq);
-		wled->ovp_irq_disabled = true;
-	}
 
 	/* read configured sink configuration */
 	rc = qpnp_wled_read_reg(wled,
@@ -1130,6 +1140,17 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 		goto failed_calib;
 	}
 
+	if (wled->en_cabc) {
+		for (i = 0; i < wled->max_strings; i++) {
+			reg = 0;
+			rc = qpnp_wled_masked_write_reg(wled,
+				QPNP_WLED_CABC_REG(wled->sink_base, i),
+				QPNP_WLED_CABC_MASK, reg);
+			if (rc < 0)
+				goto failed_calib;
+		}
+	}
+
 	/* disable all sinks */
 	rc = qpnp_wled_write_reg(wled,
 		 QPNP_WLED_CURR_SINK_REG(wled->sink_base), 0);
@@ -1137,21 +1158,6 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 		pr_err("Failed to disable all sinks rc=%d\n", rc);
 		goto failed_calib;
 	}
-
-	rc = qpnp_wled_masked_write_reg(wled,
-		QPNP_WLED_MODULE_EN_REG(wled->ctrl_base),
-		QPNP_WLED_MODULE_EN_MASK,
-		QPNP_WLED_MODULE_EN_MASK);
-	if (rc < 0) {
-		pr_err("Failed to enable WLED module rc=%d\n", rc);
-		goto failed_calib;
-	}
-	/*
-	 * Delay for the WLED soft-start, check the OVP status
-	 * only after soft-start is complete
-	 */
-	usleep_range(QPNP_WLED_SOFT_START_DLY_US,
-			QPNP_WLED_SOFT_START_DLY_US + 1000);
 
 	/* iterate through the strings one by one */
 	for (i = 0; i < wled->max_strings; i++) {
@@ -1176,6 +1182,15 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 			goto failed_calib;
 		}
 
+		/* Enable the module */
+		rc = qpnp_wled_masked_write_reg(wled,
+			QPNP_WLED_MODULE_EN_REG(wled->ctrl_base),
+			QPNP_WLED_MODULE_EN_MASK, QPNP_WLED_MODULE_EN_MASK);
+		if (rc < 0) {
+			pr_err("Failed to enable WLED module rc=%d\n", rc);
+			goto failed_calib;
+		}
+
 		/* delay for WLED soft-start */
 		usleep_range(QPNP_WLED_SOFT_START_DLY_US,
 				QPNP_WLED_SOFT_START_DLY_US + 1000);
@@ -1192,6 +1207,15 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 						i + 1);
 		else
 			sink_valid |= sink_test;
+
+		/* Disable the module */
+		rc = qpnp_wled_masked_write_reg(wled,
+			QPNP_WLED_MODULE_EN_REG(wled->ctrl_base),
+			QPNP_WLED_MODULE_EN_MASK, 0);
+		if (rc < 0) {
+			pr_err("Failed to disable WLED module rc=%d\n", rc);
+			goto failed_calib;
+		}
 	}
 
 	if (sink_valid == sink_config) {
@@ -1205,14 +1229,7 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 
 	if (!sink_config) {
 		pr_warn("No valid WLED sinks found\n");
-		goto failed_calib;
-	}
-
-	rc = qpnp_wled_masked_write_reg(wled,
-			QPNP_WLED_MODULE_EN_REG(wled->ctrl_base),
-			QPNP_WLED_MODULE_EN_MASK, 0);
-	if (rc < 0) {
-		pr_err("Failed to disable WLED module rc=%d\n", rc);
+		wled->module_dis_perm = true;
 		goto failed_calib;
 	}
 
@@ -1226,6 +1243,15 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 
 	/* MODULATOR_EN setting for valid sinks */
 	for (i = 0; i < wled->max_strings; i++) {
+		if (wled->en_cabc) {
+			reg = 1 << QPNP_WLED_CABC_SHIFT;
+			rc = qpnp_wled_masked_write_reg(wled,
+				QPNP_WLED_CABC_REG(wled->sink_base, i),
+				QPNP_WLED_CABC_MASK, reg);
+			if (rc < 0)
+				goto failed_calib;
+		}
+
 		if (sink_config & (1 << (QPNP_WLED_CURR_SINK_SHIFT + i)))
 			reg = (QPNP_WLED_MOD_EN << QPNP_WLED_MOD_EN_SHFT);
 		else
@@ -1254,7 +1280,8 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 	}
 
 	/* restore  brightness */
-	rc = qpnp_wled_set_level(wled, wled->cdev.brightness);
+	rc = qpnp_wled_set_level(wled, !wled->cdev.brightness ?
+			AUTO_CALIB_BRIGHTNESS : wled->cdev.brightness);
 	if (rc < 0) {
 		pr_err("Failed to set brightness after calibration rc=%d\n",
 						rc);
@@ -1275,11 +1302,6 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 			QPNP_WLED_SOFT_START_DLY_US + 1000);
 
 failed_calib:
-	if (wled->ovp_irq > 0 && wled->ovp_irq_disabled) {
-		enable_irq(wled->ovp_irq);
-		wled->ovp_irq_disabled = false;
-	}
-	mutex_unlock(&wled->lock);
 	return rc;
 }
 
@@ -1315,6 +1337,38 @@ static bool qpnp_wled_auto_cal_required(struct qpnp_wled *wled)
 	return false;
 }
 
+static int qpnp_wled_auto_calibrate_at_init(struct qpnp_wled *wled)
+{
+	int rc;
+	u8 fault_status = 0, rt_status = 0;
+
+	if (!wled->auto_calib_enabled)
+		return 0;
+
+	rc = qpnp_wled_read_reg(wled,
+			QPNP_WLED_INT_RT_STS(wled->ctrl_base), &rt_status);
+	if (rc < 0)
+		pr_err("Failed to read RT status rc=%d\n", rc);
+
+	rc = qpnp_wled_read_reg(wled,
+			QPNP_WLED_FAULT_STATUS(wled->ctrl_base), &fault_status);
+	if (rc < 0)
+		pr_err("Failed to read fault status rc=%d\n", rc);
+
+	if ((rt_status & QPNP_WLED_OVP_FLT_RT_STS_BIT) ||
+			(fault_status & QPNP_WLED_OVP_FAULT_BIT)) {
+		mutex_lock(&wled->lock);
+		rc = wled_auto_calibrate(wled);
+		if (rc < 0)
+			pr_err("Failed auto-calibration rc=%d\n", rc);
+		else
+			wled->auto_calib_done = true;
+		mutex_unlock(&wled->lock);
+	}
+
+	return rc;
+}
+
 /* ovp irq handler */
 static irqreturn_t qpnp_wled_ovp_irq_handler(int irq, void *_wled)
 {
@@ -1343,13 +1397,26 @@ static irqreturn_t qpnp_wled_ovp_irq_handler(int irq, void *_wled)
 	if (fault_sts & QPNP_WLED_OVP_FAULT_BIT) {
 		if (wled->auto_calib_enabled && !wled->auto_calib_done) {
 			if (qpnp_wled_auto_cal_required(wled)) {
-				rc = wled_auto_calibrate(wled);
-				if (rc < 0) {
-					pr_err("Failed auto-calibration rc=%d\n",
-							rc);
-					return IRQ_HANDLED;
+				mutex_lock(&wled->lock);
+				if (wled->ovp_irq > 0 &&
+						!wled->ovp_irq_disabled) {
+					disable_irq_nosync(wled->ovp_irq);
+					wled->ovp_irq_disabled = true;
 				}
-				wled->auto_calib_done = true;
+
+				rc = wled_auto_calibrate(wled);
+				if (rc < 0)
+					pr_err("Failed auto-calibration rc=%d\n",
+								rc);
+				else
+					wled->auto_calib_done = true;
+
+				if (wled->ovp_irq > 0 &&
+						wled->ovp_irq_disabled) {
+					enable_irq(wled->ovp_irq);
+					wled->ovp_irq_disabled = false;
+				}
+				mutex_unlock(&wled->lock);
 			}
 		}
 	}
@@ -1941,6 +2008,10 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 		return rc;
 	}
 
+	rc = qpnp_wled_auto_calibrate_at_init(wled);
+	if (rc < 0)
+		pr_err("Failed to auto-calibrate at init rc=%d\n", rc);
+
 	/* setup ovp and sc irqs */
 	if (wled->ovp_irq >= 0) {
 		rc = devm_request_threaded_irq(&wled->pdev->dev, wled->ovp_irq,
@@ -2130,7 +2201,8 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 	if (wled->pmic_rev_id->pmic_subtype == PMI8998_SUBTYPE ||
 		wled->pmic_rev_id->pmic_subtype == PM660L_SUBTYPE) {
 
-		if (wled->pmic_rev_id->rev4 == PMI8998_V2P0_REV4)
+		if (wled->pmic_rev_id->pmic_subtype == PMI8998_SUBTYPE &&
+				wled->pmic_rev_id->rev4 == PMI8998_V2P0_REV4)
 			wled->lcd_auto_pfm_en = false;
 		else
 			wled->lcd_auto_pfm_en = true;
@@ -2452,7 +2524,7 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 			goto sysfs_fail;
 		}
 	}
-
+    bob_test = regulator_get(&pdev->dev, "bob_test");
 	return 0;
 
 sysfs_fail:
