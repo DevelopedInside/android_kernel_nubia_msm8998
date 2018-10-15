@@ -667,6 +667,7 @@ static int32_t msm_actuator_move_focus(
         return -EFAULT;
     }
     /*Allocate memory for damping parameters of all regions*/
+    #if 0
     ringing_params_kernel = kmalloc(
         sizeof(struct damping_params_t)*(a_ctrl->region_size),
         GFP_KERNEL);
@@ -674,6 +675,8 @@ static int32_t msm_actuator_move_focus(
         pr_err("kmalloc for damping parameters failed\n");
         return -EFAULT;
     }
+    #endif
+
     if (copy_from_user(ringing_params_kernel,
         &(move_params->ringing_params[0]),
         (sizeof(struct damping_params_t))*(a_ctrl->region_size))) {
@@ -868,6 +871,14 @@ static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 	int32_t rc = 0;
 	uint16_t next_lens_pos = 0;
 	struct msm_camera_i2c_reg_setting reg_setting;
+    //uint16_t num_loop = 0;
+	
+    //ztemt: fyc add for avoiding other project enter this function
+    if(strcmp(a_ctrl->act_name,"dw9718s") != 0) //actuator_name is "dw9718s"
+    {
+        return 0;
+    }
+    //ztemt: fyc add for avoiding other project enter this function
 
 	a_ctrl->i2c_tbl_index = 0;
 	if ((a_ctrl->curr_step_pos > a_ctrl->total_steps) ||
