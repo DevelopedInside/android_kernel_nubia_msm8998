@@ -32,7 +32,7 @@
 #define CYCLES_PER_MICRO_SEC_DEFAULT 4915
 #define CCI_MAX_DELAY 1000000
 
-#define CCI_TIMEOUT msecs_to_jiffies(100)
+#define CCI_TIMEOUT msecs_to_jiffies(800) // ZTEMT: fuyipeng modify for timeout
 
 /* TODO move this somewhere else */
 #define MSM_CCI_DRV_NAME "msm_cci"
@@ -951,6 +951,15 @@ static int32_t msm_cci_i2c_read(struct v4l2_subdev *sd,
 	} else {
 		rc = 0;
 	}
+
+/*ZTEMT: fengxun add for ov5675 eeprom unlock bug--------Start*/
+#ifndef CONFIG_AL3200
+       if(c_ctrl->cci_info->is_cal_mode){
+            CDBG("%s  sleep 6us\n", __func__);
+            usleep_range(6000,6100);
+       }
+#endif
+/*ZTEMT: fengxun add for ov5675 eeprom unlock bug--------End*/
 
 	read_words = msm_camera_io_r_mb(cci_dev->base +
 		CCI_I2C_M0_READ_BUF_LEVEL_ADDR + master * 0x100);
