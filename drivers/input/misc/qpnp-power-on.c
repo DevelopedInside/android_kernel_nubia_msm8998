@@ -228,6 +228,10 @@ module_param_named(
 	ship_mode_en, pon_ship_mode_en, int, 0600
 );
 
+#ifdef CONFIG_NUBIA_PWRKEY_DUMP
+static struct kobject *nubia_pwrkey_dump_kobj=NULL;
+#endif
+
 static struct qpnp_pon *sys_reset_dev;
 static DEFINE_SPINLOCK(spon_list_slock);
 static LIST_HEAD(spon_dev_list);
@@ -1986,6 +1990,95 @@ static int read_gen2_pon_off_reason(struct qpnp_pon *pon, u16 *reason,
 	return 0;
 }
 
+
+#ifdef CONFIG_NUBIA_PWRKEY_DUMP
+static int dump_enable=0;
+
+static ssize_t dump_enable_store(struct kobject *kobj,
+	    struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int rc = 0, i = 0;
+	struct qpnp_pon_config *cfg;
+	struct qpnp_pon *pon = sys_reset_dev;
+
+	sscanf(buf, "%d", &dump_enable);
+	printk("nubia_pwrkey_dump: dump_enable=%d\n",dump_enable);
+
+	if (!pon)
+		return 0;
+	printk("nubia_pwrkey_dump: pon=0x%p\n",pon);
+
+	for (i = 0; i < pon->num_pon_config; i++) {
+		cfg = &pon->pon_cfg[i];
+		printk("===================================================\n");
+		printk("nubia_pwrkey_dump: i=%d , cfg->pon_type=%d\n",i,cfg->pon_type);
+		printk("nubia_pwrkey_dump: i=%d , cfg->support_reset=%d\n",i,cfg->support_reset);
+		printk("nubia_pwrkey_dump: i=%d , cfg->key_code=%d\n",i,cfg->key_code);
+
+		if (cfg->pon_type==PON_KPDPWR && cfg->support_reset==1) {
+
+			/* disable S2 reset */
+			rc = qpnp_pon_masked_write(pon, cfg->s2_cntl2_addr,
+					 QPNP_PON_S2_CNTL_EN, 0);
+			if (rc) {
+			 dev_err(&pon->pdev->dev, "Unable to configure S2 enable\n");
+			 return rc;
+			}
+
+			usleep_range(100, 120);
+
+			if(dump_enable==1){
+				 printk("nubia_pwrkey_dump: dump enable cfg->s2_type=PON_POWER_OFF_WARM_RESET \n");
+				 rc = qpnp_pon_masked_write(pon, cfg->s2_cntl_addr,
+							 QPNP_PON_S2_CNTL_TYPE_MASK, PON_POWER_OFF_WARM_RESET);
+			 }
+			else{
+				 printk("nubia_pwrkey_dump: dump disable cfg->s2_type=%d \n",cfg->s2_type);
+				 rc = qpnp_pon_masked_write(pon, cfg->s2_cntl_addr,
+							 QPNP_PON_S2_CNTL_TYPE_MASK, (u8)cfg->s2_type);
+			}
+			if (rc) {
+			 dev_err(&pon->pdev->dev,
+				 "Unable to configure S2 reset type\n");
+			 return rc;
+			}
+
+			/* enable S2 reset */
+			rc = qpnp_pon_masked_write(pon, cfg->s2_cntl2_addr,
+					QPNP_PON_S2_CNTL_EN, QPNP_PON_S2_CNTL_EN);
+			if (rc) {
+			dev_err(&pon->pdev->dev, "Unable to configure S2 enable\n");
+			return rc;
+			}
+
+			return count;
+		}
+
+	}
+
+	return count;
+}
+
+static ssize_t dump_enable_show(struct kobject *kobj,
+	   struct kobj_attribute *attr, char *buf)
+{
+    return sprintf(buf, "%d", dump_enable);
+}
+
+static struct kobj_attribute dump_enable_attr=
+    __ATTR(dump_enable, 0664, dump_enable_show, dump_enable_store);
+
+static struct attribute *nubia_pwrkey_dump_attrs[] = {
+    &dump_enable_attr.attr,
+    NULL,
+};
+
+static struct attribute_group nubia_pwrkey_dump_attr_group = {
+    .attrs = nubia_pwrkey_dump_attrs,
+};
+#endif
+
+
 static int qpnp_pon_probe(struct platform_device *pdev)
 {
 	struct qpnp_pon *pon;
@@ -2020,6 +2113,17 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		return -EINVAL;
 	} else if (sys_reset) {
 		sys_reset_dev = pon;
+#ifdef CONFIG_NUBIA_PWRKEY_DUMP
+		nubia_pwrkey_dump_kobj = kobject_create_and_add("nubia_pwrkey_dump", NULL);
+		if(nubia_pwrkey_dump_kobj)
+		{
+			rc = sysfs_create_group(nubia_pwrkey_dump_kobj,&nubia_pwrkey_dump_attr_group);
+			if(rc)
+			{
+				printk(KERN_ERR "%s: failed to create nubia_pwrkey_dump group attributes\n", __func__);
+			}
+		}
+#endif
 	}
 
 	pon->pdev = pdev;
