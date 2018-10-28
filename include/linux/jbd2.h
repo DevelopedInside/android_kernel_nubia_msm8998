@@ -47,7 +47,12 @@
 /*
  * The default maximum commit age, in seconds.
  */
-#define JBD2_DEFAULT_MAX_COMMIT_AGE 5
+//nubia del 
+//#define JBD2_DEFAULT_MAX_COMMIT_AGE 5
+//nubia del end
+//nubia add 
+#define JBD2_DEFAULT_MAX_COMMIT_AGE 30
+//nubia add end
 
 #ifdef CONFIG_JBD2_DEBUG
 /*
