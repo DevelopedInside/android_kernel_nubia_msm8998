@@ -170,6 +170,13 @@ config INPUT_QPNP_POWER_ON
 	  reporting the change in status of the KPDPWR_N line (connected to the
 	  power-key) as well as reset features.
 
+config NUBIA_PWRKEY_DUMP
+	bool "NUBIA_PWRKEY_DUMP"
+	depends on INPUT_QPNP_POWER_ON
+	default y
+	help
+	  NUBIA_PWRKEY_DUMP.
+
 config INPUT_SPARCSPKR
 	tristate "SPARC Speaker support"
 	depends on PCI && SPARC64
