@@ -104,6 +104,15 @@ config PINCTRL_MSM8998
 	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
 	  Qualcomm TLMM block found in the Qualcomm MSM8998 platform.
 
+config NUBIA_SKIP_TZ_AC_GPIO
+	bool "Feature nubia skip TZ mask"
+	depends on GPIOLIB && OF && DEBUG_FS && PINCTRL_MSM8998
+	default y
+	select PINCTRL_MSM
+	help
+	  when cat the debugfs node "gpio"
+	  when the gpio pin is TZ protect,skip it, avoid happy TZ crash when get gpio status.
+
 config PINCTRL_MSM8996
 	tristate "Qualcomm MSM8996 pin controller driver"
 	depends on GPIOLIB && OF
