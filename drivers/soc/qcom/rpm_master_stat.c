@@ -27,7 +27,7 @@
 
 #include "rpm_stats.h"
 
-#define RPM_MASTERS_BUF_LEN 400
+#define RPM_MASTERS_BUF_LEN 500
 
 #define SNPRINTF(buf, size, format, ...) \
 	do { \
