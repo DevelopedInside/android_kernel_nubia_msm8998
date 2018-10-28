@@ -23,6 +23,12 @@
 #include <linux/backing-dev.h>
 #endif
 
+//Nubia FileObserver Begin
+#ifdef ENABLE_FILE_OBSERVER
+#include "observer.h"
+#endif
+//Nubia FileObserver End
+
 static ssize_t sdcardfs_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
@@ -77,6 +83,12 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 					file_inode(lower_file));
 		fsstack_copy_attr_times(d_inode(dentry),
 					file_inode(lower_file));
+
+		//Nubia FileObserver Begin
+		#ifdef ENABLE_FILE_OBSERVER
+		sdcardfs_post_file_write(file);
+		#endif
+		//Nubia FileObserver End
 	}
 
 	return err;
@@ -108,6 +120,14 @@ static long sdcardfs_unlocked_ioctl(struct file *file, unsigned int cmd,
 	struct dentry *dentry = file->f_path.dentry;
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 
+//Nubia FileObserver Begin
+    #ifdef ENABLE_FILE_OBSERVER
+	if(sdcardfs_do_fileobserver_ioctl(file, cmd, arg)) {
+		return 0;
+	}
+	#endif
+//Nubia FileObserver End
+
 	lower_file = sdcardfs_lower_file(file);
 
 	/* XXX: use vfs_ioctl if/when VFS exports it */
@@ -138,6 +158,14 @@ static long sdcardfs_compat_ioctl(struct file *file, unsigned int cmd,
 	const struct cred *saved_cred = NULL;
 	struct dentry *dentry = file->f_path.dentry;
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
+
+//Nubia FileObserver Begin
+    #ifdef ENABLE_FILE_OBSERVER
+	if(sdcardfs_do_fileobserver_ioctl(file, cmd, arg)) {
+		return 0;
+	}
+	#endif
+//Nubia FileObserver End
 
 	lower_file = sdcardfs_lower_file(file);
 
@@ -298,6 +326,12 @@ static int sdcardfs_file_release(struct inode *inode, struct file *file)
 		sdcardfs_set_lower_file(file, NULL);
 		fput(lower_file);
 	}
+
+	//Nubia FileObserver Begin
+	#ifdef ENABLE_FILE_OBSERVER
+	sdcardfs_post_file_release(inode, file);
+	#endif
+	//Nubia FileObserver End
 
 	kfree(SDCARDFS_F(file));
 	return 0;
