@@ -3670,6 +3670,18 @@ irqreturn_t smblib_handle_usbin_uv(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+irqreturn_t smblib_handle_usbin_ov(int irq, void *data)
+{
+	struct smb_irq_data *irq_data = data;
+	struct smb_charger *chg = irq_data->parent_data;
+
+	smblib_dbg(chg, PR_INTERRUPT, "IRQ: %s\n", irq_data->name);
+	if (chg->batt_psy)
+		power_supply_changed(chg->batt_psy);
+
+	return IRQ_HANDLED;
+}
+
 static void smblib_micro_usb_plugin(struct smb_charger *chg, bool vbus_rising)
 {
 	if (vbus_rising) {
