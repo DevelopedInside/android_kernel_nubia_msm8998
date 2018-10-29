@@ -989,12 +989,12 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 		if (info) {
 			p_mask = info->peripheral_mask;
 			mutex_unlock(&driver->md_session_lock);
-			if (MD_PERIPHERAL_MASK(reg_item->proc) & p_mask)
+			if (MD_PERIPHERAL_MASK(reg_item->proc) & p_mask) {
 				write_len = diag_send_data(reg_item, buf, len);
                             if(ntype != 0){
                                 pr_err("diag: In %s, received FTM debug cmd %s info\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
                             }
-			    }else{
+			    } else {
                             if(ntype != 0){
                                 pr_err("diag: In %s, received FTM debug cmd %s info ignore\n", __func__, (ntype == 1) ? " wireless " : " wifi ");
                             }
@@ -1002,17 +1002,17 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 		} else {
 			mutex_unlock(&driver->md_session_lock);
 			if (MD_PERIPHERAL_MASK(reg_item->proc) &
-				driver->logging_mask)
+				driver->logging_mask) {
 				diag_send_error_rsp(buf, len, pid);
                             if(ntype != 0){
                                 pr_err("diag: In %s, received FTM debug cmd %s no info error reg_item->proc %d driver->logging_mask %d\n", __func__, (ntype == 1) ? " wireless " : " wifi ", reg_item->proc, driver->logging_mask);
                             }
-			else
+			} else {
 				write_len = diag_send_data(reg_item, buf, len);
                             if(ntype != 0){
                                 pr_err("diag: In %s, received FTM debug cmd %s no info success reg_item->proc %d driver->logging_mask %d\n", __func__, (ntype == 1) ? " wireless " : " wifi ", reg_item->proc, driver->logging_mask);
                             }
-			    }
+			}
 		}
 		mutex_unlock(&driver->cmd_reg_mutex);
 		return write_len;
@@ -1080,7 +1080,7 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 		/* send response back */
 		//driver->apps_rsp_buf[0] = *buf;
 		memcpy(driver->apps_rsp_buf,buf,3);
-		diag_send_rsp(driver->apps_rsp_buf, 1, info);
+		diag_send_rsp(driver->apps_rsp_buf, 1, pid);
 		msleep(5000);
 		printk(KERN_CRIT "diag: reboot set, Rebooting SoC..\n");
 		kernel_restart(NULL);
