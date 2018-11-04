@@ -1319,10 +1319,14 @@ static int smb2_batt_prop_is_writeable(struct power_supply *psy,
 
 static const struct power_supply_desc batt_psy_desc = {
 	.name = "battery",
+#if defined(CONFIG_ZTE_NX563J)
+	.type = POWER_SUPPLY_TYPE_BATTERY,
+#else
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	.type = POWER_SUPPLY_TYPE_MAINS,
 #else
 	.type = POWER_SUPPLY_TYPE_BATTERY,
+#endif
 #endif
 	.properties = smb2_batt_props,
 	.num_properties = ARRAY_SIZE(smb2_batt_props),
