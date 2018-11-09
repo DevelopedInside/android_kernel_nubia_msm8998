@@ -842,21 +842,6 @@ binder_enqueue_work(struct binder_proc *proc,
 	binder_inner_proc_unlock(proc);
 }
 
-// nubia add
-static void
-binder_enqueue_work_at_head(struct binder_proc *proc,
-		    struct binder_work *work,
-		    struct list_head *target_list)
-{
-    BUG_ON(target_list == NULL);
-	BUG_ON(work->entry.next && !list_empty(&work->entry));
-
-	binder_inner_proc_lock(proc);
-	list_add(&work->entry, target_list);
-	binder_inner_proc_unlock(proc);
-}
-// nubia add end
-
 static void
 binder_dequeue_work_ilocked(struct binder_work *work)
 {
@@ -3384,32 +3369,15 @@ err_invalid_target_handle:
 		binder_restore_priority(current, in_reply_to->saved_priority);
 		thread->return_error.cmd = BR_TRANSACTION_COMPLETE;
         // nubia delete
-        /*
 		binder_enqueue_work(thread->proc,
 				    &thread->return_error.work,
 				    &thread->todo);
-        */
-        // nubia delete end
-        // nubia add
-        binder_enqueue_work_at_head(thread->proc,
-				    &thread->return_error.work,
-				    &thread->todo);
-        // nubia add end
 		binder_send_failed_reply(in_reply_to, return_error);
 	} else {
 		thread->return_error.cmd = return_error;
-        // nubia delete
-        /*
 		binder_enqueue_work(thread->proc,
 				    &thread->return_error.work,
 				    &thread->todo);
-        */
-        // nubia delete end
-        // nubia add
-		binder_enqueue_work_at_head(thread->proc,
-				    &thread->return_error.work,
-				    &thread->todo);
-        // nubia add end
 	}
 }
 
@@ -3711,20 +3679,10 @@ static int binder_thread_write(struct binder_proc *proc,
 					WARN_ON(thread->return_error.cmd !=
 						BR_OK);
 					thread->return_error.cmd = BR_ERROR;
-                    // nubia delete
-                    /*
 					binder_enqueue_work(
 						thread->proc,
 						&thread->return_error.work,
 						&thread->todo);
-                    */
-                    // nubia delete end
-                    // nubia add
-                    binder_enqueue_work_at_head(
-						thread->proc,
-						&thread->return_error.work,
-						&thread->todo);
-                    // nubia add end
 					binder_debug(
 						BINDER_DEBUG_FAILED_TRANSACTION,
 						"%d:%d BC_REQUEST_DEATH_NOTIFICATION failed\n",
@@ -4060,9 +4018,6 @@ retry:
 			ptr += sizeof(uint32_t);
 
 			binder_stat_br(proc, thread, cmd);
-            // nubia add
-            goto done;
-            // nubia add end
 		} break;
 		case BINDER_WORK_TRANSACTION_COMPLETE: {
 			binder_inner_proc_unlock(proc);
