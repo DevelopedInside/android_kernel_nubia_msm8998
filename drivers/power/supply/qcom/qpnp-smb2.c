@@ -1340,12 +1340,14 @@ static int smb2_init_batt_psy(struct smb2 *chip)
 	struct power_supply_config batt_cfg = {};
 	struct smb_charger *chg = &chip->chg;
 	int rc = 0;
+#if !defined(CONFIG_ZTE_NX563J)
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	static char *smb2_supplicants[] = {
 		"neo-battery",
 	};
 	batt_cfg.supplied_to = smb2_supplicants;
 	batt_cfg.num_supplicants = ARRAY_SIZE(smb2_supplicants);
+#endif
 #endif
 	batt_cfg.drv_data = chg;
 	batt_cfg.of_node = chg->dev->of_node;
@@ -1800,6 +1802,7 @@ static int smb2_init_hw(struct smb2 *chip)
 	 * AICL configuration:
 	 * start from min and AICL ADC disable
 	 */
+#if !defined(CONFIG_ZTE_NX563J)
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	/* Parallel Charging on STAT Pin Condition */
 	rc = smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
@@ -1828,6 +1831,7 @@ static int smb2_init_hw(struct smb2 *chip)
 		dev_err(chg->dev, "Couldn't configure TYPE_C_CFG_REG rc=%d\n", rc);
 		return rc;
 	}
+#endif
 #endif
 
 	rc = smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
