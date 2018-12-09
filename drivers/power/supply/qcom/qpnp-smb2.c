@@ -1696,7 +1696,7 @@ static int smb2_init_hw(struct smb2 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
 	int rc;
-	u8 stat, val;
+	u8 stat;
 
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	rc = smblib_write(chg, HVDCP_PULSE_COUNT_MAX, HVDCP_DEFAULT_VALUE);
@@ -1886,6 +1886,16 @@ static int smb2_init_hw(struct smb2 *chip)
 		return rc;
 	}
 
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	/* configure step charging */
+	rc = smb2_config_step_charging(chip);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure step charging rc=%d\n",
+			rc);
+		return rc;
+	}
+#else
+	u8 val;
 	val = (ilog2(chip->dt.wd_bark_time / 16) << BARK_WDOG_TIMEOUT_SHIFT) &
 						BARK_WDOG_TIMEOUT_MASK;
 	val |= BITE_WDOG_TIMEOUT_8S;
@@ -1907,15 +1917,6 @@ static int smb2_init_hw(struct smb2 *chip)
 			BARK_WDOG_INT_EN_BIT);
 	if (rc) {
 		pr_err("Couldn't configue WD config rc=%d\n", rc);
-		return rc;
-	}
-
-#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
-	/* configure step charging */
-	rc = smb2_config_step_charging(chip);
-	if (rc < 0) {
-		dev_err(chg->dev, "Couldn't configure step charging rc=%d\n",
-			rc);
 		return rc;
 	}
 #endif
@@ -2157,7 +2158,10 @@ static int smb2_determine_initial_status(struct smb2 *chip)
 #endif
 
 	smblib_handle_batt_temp_changed(0, &irq_data);
+
+#if !defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
 	smblib_handle_wdog_bark(0, &irq_data);
+#endif
 
 	return 0;
 }
@@ -2329,8 +2333,12 @@ static struct smb_irq_info smb2_irqs[] = {
 	},
 	[WDOG_BARK_IRQ] = {
 		.name		= "wdog-bark",
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+		.handler	= NULL,
+#else
 		.handler	= smblib_handle_wdog_bark,
 		.wake		= true,
+#endif
 	},
 	[AICL_FAIL_IRQ] = {
 		.name		= "aicl-fail",
@@ -2587,6 +2595,20 @@ static int smb2_probe(struct platform_device *pdev)
 		return rc;
 	}
 #endif
+
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	rc = smblib_init(chg);
+	if (rc < 0) {
+		pr_err("Smblib_init failed rc=%d\n", rc);
+		goto cleanup;
+	}
+
+	rc = smb2_parse_dt(chip);
+	if (rc < 0) {
+		pr_err("Couldn't parse device tree rc=%d\n", rc);
+		goto cleanup;
+	}
+#else
 	rc = smb2_parse_dt(chip);
 	if (rc < 0) {
 		pr_err("Couldn't parse device tree rc=%d\n", rc);
@@ -2598,6 +2620,7 @@ static int smb2_probe(struct platform_device *pdev)
 		pr_err("Smblib_init failed rc=%d\n", rc);
 		goto cleanup;
 	}
+#endif
 
 	/* set driver data before resources request it */
 	platform_set_drvdata(pdev, chip);
