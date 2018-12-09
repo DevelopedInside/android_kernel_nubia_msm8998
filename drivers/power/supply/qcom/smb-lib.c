@@ -104,6 +104,37 @@ unlock:
 	return rc;
 }
 
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+static int smblib_get_step_cc_delta(struct smb_charger *chg, int *cc_delta_ua)
+{
+	int rc, step_state;
+	u8 stat;
+
+	if (!chg->step_chg_enabled) {
+		*cc_delta_ua = 0;
+		return 0;
+	}
+
+	rc = smblib_read(chg, BATTERY_CHARGER_STATUS_1_REG, &stat);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read BATTERY_CHARGER_STATUS_1 rc=%d\n",
+			rc);
+		return rc;
+	}
+
+	step_state = (stat & STEP_CHARGING_STATUS_MASK) >>
+				STEP_CHARGING_STATUS_SHIFT;
+	rc = smblib_get_charge_param(chg, &chg->param.step_cc_delta[step_state],
+				     cc_delta_ua);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't get step cc delta rc=%d\n", rc);
+		return rc;
+	}
+
+	return 0;
+}
+#endif
+
 static int smblib_get_jeita_cc_delta(struct smb_charger *chg, int *cc_delta_ua)
 {
 	int rc, cc_minus_ua;
@@ -3206,6 +3237,28 @@ static int smblib_recover_from_soft_jeita(struct smb_charger *chg)
 int smblib_get_prop_fcc_delta(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	int rc, jeita_cc_delta_ua, step_cc_delta_ua, hw_cc_delta_ua = 0;
+
+	rc = smblib_get_step_cc_delta(chg, &step_cc_delta_ua);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't get step cc delta rc=%d\n", rc);
+		step_cc_delta_ua = 0;
+	} else {
+		hw_cc_delta_ua = step_cc_delta_ua;
+	}
+
+	rc = smblib_get_jeita_cc_delta(chg, &jeita_cc_delta_ua);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't get jeita cc delta rc=%d\n", rc);
+		jeita_cc_delta_ua = 0;
+	} else if (jeita_cc_delta_ua < 0) {
+		/* HW will take the min between JEITA and step charge */
+		hw_cc_delta_ua = min(hw_cc_delta_ua, jeita_cc_delta_ua);
+	}
+
+	val->intval = hw_cc_delta_ua;
+#else
 	int rc, jeita_cc_delta_ua = 0;
 
 	rc = smblib_get_jeita_cc_delta(chg, &jeita_cc_delta_ua);
@@ -3215,6 +3268,7 @@ int smblib_get_prop_fcc_delta(struct smb_charger *chg,
 	}
 
 	val->intval = jeita_cc_delta_ua;
+#endif
 	return 0;
 }
 
