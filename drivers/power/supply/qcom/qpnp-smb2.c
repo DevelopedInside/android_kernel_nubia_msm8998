@@ -294,10 +294,13 @@ static int smb2_parse_dt(struct smb2 *chip)
 		return -EINVAL;
 	}
 #if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+#if defined(CONFIG_ZTE_NX563J)
+	chg->step_chg_enabled = true;
+#else
 	chg->step_chg_enabled = false;
 	chg->step_soc_threshold = chip->dt.step_soc_threshold;
 	chg->step_cc_delta = chip->dt.step_cc_delta;
-
+#endif
 	if (of_property_count_u32_elems(node, "qcom,step-soc-thresholds")
 			!= STEP_CHARGING_MAX_STEPS - 1)
 		chg->step_chg_enabled = false;
