@@ -2262,10 +2262,14 @@ static struct smb_irq_info smb2_irqs[] = {
 	},
 	[USBIN_OV_IRQ] = {
 		.name		= "usbin-ov",
+#if defined(CONFIG_ZTE_NX563J)
+		.handler	= smblib_handle_debug,
+#else
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 		.handler	= smblib_handle_usbin_ov,
 #else
 		.handler	= smblib_handle_debug,
+#endif
 #endif
 	},
 	[USBIN_PLUGIN_IRQ] = {
@@ -2352,10 +2356,14 @@ static struct smb_irq_info smb2_irqs[] = {
 	[SWITCH_POWER_OK_IRQ] = {
 		.name		= "switcher-power-ok",
 		.handler	= smblib_handle_switcher_power_ok,
+	#if defined(CONFIG_ZTE_NX563J)
+		.storm_data	= {true, 1000, 8},
+	#else
 	#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 		.storm_data	= {true, 1000, 3},
 	#else
 		.storm_data	= {true, 1000, 8},
+	#endif
 	#endif
 	},
 };
