@@ -1048,7 +1048,7 @@ int smblib_set_icl_current(struct smb_charger *chg, int icl_ua)
 	bool override;
 
 	/* suspend and return if 25mA or less is requested */
-	if (icl_ua <= USBIN_25MA)
+	if (icl_ua < USBIN_25MA)
 		return smblib_set_usb_suspend(chg, true);
 
 	if (icl_ua == INT_MAX)
