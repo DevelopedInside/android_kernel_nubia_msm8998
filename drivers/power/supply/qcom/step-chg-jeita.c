@@ -90,9 +90,8 @@ static struct step_chg_cfg step_chg_config = {
 	.prop_name = "SOC",
 	.fcc_cfg	= {
 		//SOC_LOW	SOC_HIGH	FCC
-		{0,			60,			2100000},
-		{60,		70,			1150000},
-		{70,		100,		 200000},
+		{0,     60,     2150000},
+		{61,    100,    1200000},
 	},
 #else
 	.psy_prop	= POWER_SUPPLY_PROP_VOLTAGE_NOW,
