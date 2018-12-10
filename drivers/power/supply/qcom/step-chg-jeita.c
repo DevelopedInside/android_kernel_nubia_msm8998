@@ -83,6 +83,18 @@ static struct step_chg_info *the_chip;
  * range data must be in increasing ranges and shouldn't overlap
  */
 static struct step_chg_cfg step_chg_config = {
+#if defined(CONFIG_ZTE_NX563J)
+	/* qcom,step-soc-thresholds = <60 70 80 90>;
+	qcom,step-current-deltas = <950000 950000 0 0 0>; */
+	.psy_prop = POWER_SUPPLY_PROP_CAPACITY,
+	.prop_name = "SOC",
+	.fcc_cfg	= {
+		//SOC_LOW	SOC_HIGH	FCC
+		{0,			60,			2100000},
+		{60,		70,			1150000},
+		{70,		100,		 200000},
+	},
+#else
 	.psy_prop	= POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	.prop_name	= "VBATT",
 	.hysteresis	= 100000, /* 100mV */
@@ -92,6 +104,7 @@ static struct step_chg_cfg step_chg_config = {
 		{4001000,	4200000,	2800000},
 		{4201000,	4400000,	2000000},
 	},
+#endif
 	/*
 	 *	SOC STEP-CHG configuration example.
 	 *
@@ -337,7 +350,7 @@ static int handle_jeita(struct step_chg_info *chip)
 	vote(chip->fv_votable, JEITA_VOTER, true, fv_uv);
 
 	pr_debug("%s = %d FCC = %duA FV = %duV\n",
-		step_chg_config.prop_name, pval.intval, fcc_ua, fv_uv);
+		jeita_fv_config.prop_name, pval.intval, fcc_ua, fv_uv);
 
 update_time:
 	chip->jeita_last_update_time = ktime_get();

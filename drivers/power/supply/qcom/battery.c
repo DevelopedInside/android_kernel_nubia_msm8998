@@ -1065,7 +1065,8 @@ int qcom_batt_init(void)
 		goto release_wakeup_source;
 	}
 
-	chip->fv_votable = create_votable("FV", VOTE_MAX,
+	//chip->fv_votable = create_votable("FV", VOTE_MAX,
+	chip->fv_votable = create_votable("FV", VOTE_MIN,
 					pl_fv_vote_callback,
 					chip);
 	if (IS_ERR(chip->fv_votable)) {
