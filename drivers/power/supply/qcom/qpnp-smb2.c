@@ -1699,7 +1699,7 @@ static int smb2_init_hw(struct smb2 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
 	int rc;
-	u8 stat;
+	u8 stat, val = 0;
 
 #if defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	rc = smblib_write(chg, HVDCP_PULSE_COUNT_MAX, HVDCP_DEFAULT_VALUE);
@@ -1898,7 +1898,6 @@ static int smb2_init_hw(struct smb2 *chip)
 		return rc;
 	}
 #else
-	u8 val;
 	val = (ilog2(chip->dt.wd_bark_time / 16) << BARK_WDOG_TIMEOUT_SHIFT) &
 						BARK_WDOG_TIMEOUT_MASK;
 	val |= BITE_WDOG_TIMEOUT_8S;
