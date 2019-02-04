@@ -2160,10 +2160,7 @@ static int smb2_determine_initial_status(struct smb2 *chip)
 #endif
 
 	smblib_handle_batt_temp_changed(0, &irq_data);
-
-#if !defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
 	smblib_handle_wdog_bark(0, &irq_data);
-#endif
 
 	return 0;
 }
@@ -2335,12 +2332,8 @@ static struct smb_irq_info smb2_irqs[] = {
 	},
 	[WDOG_BARK_IRQ] = {
 		.name		= "wdog-bark",
-#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
-		.handler	= NULL,
-#else
 		.handler	= smblib_handle_wdog_bark,
 		.wake		= true,
-#endif
 	},
 	[AICL_FAIL_IRQ] = {
 		.name		= "aicl-fail",
