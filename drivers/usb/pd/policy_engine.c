@@ -386,6 +386,7 @@ static const unsigned int usbpd_extcon_cable[] = {
 	EXTCON_USB_HOST,
 	EXTCON_USB_CC,
 	EXTCON_USB_SPEED,
+	EXTCON_USB_TYPEC_MED_HIGH_CURRENT,
 	EXTCON_NONE,
 };
 
@@ -440,7 +441,8 @@ static inline void start_usb_peripheral(struct usbpd *pd)
        extcon_set_cable_state_(pd->extcon, EXTCON_USB_SPEED, 0);
 #else
 	extcon_set_cable_state_(pd->extcon, EXTCON_USB_SPEED, 1);
-#endif
+	extcon_set_cable_state_(pd->extcon, EXTCON_USB_TYPEC_MED_HIGH_CURRENT,
+		pd->typec_mode > POWER_SUPPLY_TYPEC_SOURCE_DEFAULT ? 1 : 0);
 	extcon_set_cable_state_(pd->extcon, EXTCON_USB, 1);
 }
 
