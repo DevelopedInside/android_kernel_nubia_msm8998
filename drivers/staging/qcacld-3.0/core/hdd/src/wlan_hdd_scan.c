@@ -94,6 +94,10 @@ struct nla_policy scan_policy[QCA_WLAN_VENDOR_ATTR_SCAN_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE] = {.type = NLA_U64},
 	[QCA_WLAN_VENDOR_ATTR_SCAN_IE] = {.type = NLA_BINARY,
 					  .len = MAX_DEFAULT_SCAN_IE_LEN},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_MAC] = {.type = NLA_UNSPEC,
+					   .len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_MAC_MASK] = {.type = NLA_UNSPEC,
+						.len = QDF_MAC_ADDR_SIZE},
 };
 
 /**
@@ -750,17 +754,8 @@ static void hdd_scan_inactivity_timer_handler(void *scan_req)
 	if (cds_is_load_or_unload_in_progress())
 		hdd_err("%s: Module (un)loading; Ignore hdd scan req timeout",
 			 __func__);
-	else if (cds_is_driver_recovering())
-		hdd_err("%s: Module recovering; Ignore hdd scan req timeout",
-			 __func__);
-	else if (cds_is_driver_in_bad_state())
-		hdd_err("%s: Module in bad state; Ignore hdd scan req timeout",
-			 __func__);
-	else if (cds_is_self_recovery_enabled())
-		cds_trigger_recovery(CDS_SCAN_REQ_EXPIRED);
 	else
-		QDF_BUG(0);
-
+		cds_trigger_recovery(CDS_SCAN_REQ_EXPIRED);
 }
 
 /**

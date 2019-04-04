@@ -1322,6 +1322,7 @@ static void hdd_ocb_get_tsf_timer_callback(void *context_ptr,
 		return;
 	}
 
+	priv = hdd_request_priv(hdd_request);
 	if (response) {
 		priv->response = *response;
 		priv->status = 0;
@@ -1666,6 +1667,12 @@ static int __wlan_hdd_cfg80211_dcc_get_stats(struct wiphy *wiphy,
 		tb[QCA_WLAN_VENDOR_ATTR_DCC_GET_STATS_REQUEST_ARRAY]);
 	request_array = nla_data(
 		tb[QCA_WLAN_VENDOR_ATTR_DCC_GET_STATS_REQUEST_ARRAY]);
+
+	/* Check channel count. Per 11p spec, max 2 channels allowed */
+	if (!channel_count || channel_count > TGT_NUM_OCB_CHANNELS) {
+		hdd_err("Invalid channel_count %d", channel_count);
+		return -EINVAL;
+	}
 
 	hdd_request = hdd_request_alloc(&params);
 	if (!hdd_request) {
