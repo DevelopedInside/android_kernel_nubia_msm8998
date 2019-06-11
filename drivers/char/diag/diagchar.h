@@ -688,4 +688,6 @@ struct diag_md_session_t *diag_md_session_get_pid(int pid);
 struct diag_md_session_t *diag_md_session_get_peripheral(uint8_t peripheral);
 int diag_md_session_match_pid_peripheral(int pid, uint8_t peripheral);
 
+int nubia_diag_get_ftm_type(struct diag_cmd_reg_entry_t *entry);
+int nubia_diag_get_ftm_type_reg(struct diag_cmd_reg_entry_t *entry);
 #endif
