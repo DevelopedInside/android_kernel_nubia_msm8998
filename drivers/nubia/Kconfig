@@ -27,3 +27,40 @@ config NUBIA_TOUCHSCREENS
 source "drivers/nubia/touch/Kconfig"
 
 endmenu
+
+# Nubia configuration options
+
+config MACH_NUBIA
+    bool "NUBIA device"
+    depends on ARCH_QCOM
+    help
+      Support for Nubia products
+
+config MACH_NUBIA_MSM8998
+    bool "NUBIA MSM8998"
+    depends on ARCH_MSM8998
+    select MACH_NUBIA
+    help
+      Support for MSM8998 Nubia variants
+
+menu "Nubia board selection"
+
+config MACH_NUBIA_NX563J
+    bool "NUBIA_NX563J board"
+    select MACH_NUBIA_MSM8998
+    help
+      Support for Nubia Z17 variant
+
+config MACH_NUBIA_NX595J
+    bool "NUBIA_NX595J board"
+    select MACH_NUBIA_MSM8998
+    help
+      Support for Nubia Z17S variant
+
+config MACH_NUBIA_NX609J
+    bool "NUBIA_NX609J board"
+    select MACH_NUBIA_MSM8998
+    help
+      Support for Nubia Red Magic variant
+
+endmenu
