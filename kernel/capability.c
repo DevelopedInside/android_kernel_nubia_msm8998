@@ -426,6 +426,14 @@ EXPORT_SYMBOL(ns_capable_noaudit);
  */
 bool capable(int cap)
 {
+    //nubia add for ramdisk
+    if(cap == CAP_IPC_LOCK){
+        char name[sizeof(current->comm)];
+        if(strcmp(get_task_comm(name, current), "ram_disk_work") == 0){
+            return true;
+        }
+    }
+    //nubia add end
 	return ns_capable(&init_user_ns, cap);
 }
 EXPORT_SYMBOL(capable);
