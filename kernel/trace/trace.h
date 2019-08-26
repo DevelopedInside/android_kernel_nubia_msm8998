@@ -15,11 +15,21 @@
 #include <linux/trace_events.h>
 #include <linux/compiler.h>
 #include <linux/trace_seq.h>
+#include <linux/magic.h>
 
 #ifdef CONFIG_FTRACE_SYSCALLS
 #include <asm/unistd.h>		/* For NR_SYSCALLS	     */
 #include <asm/syscall.h>	/* some archs define it here */
 #endif
+
+#define FTRACE_IOCTL_MAGIC		0xa0
+#define FTRACE_IOC_RUN		_IOWR(FTRACE_IOCTL_MAGIC, 1, struct ftrace_run)
+
+struct ftrace_run {
+    bool run;// true run, false no run
+    int status;
+};
+
 
 enum trace_type {
 	__TRACE_FIRST_TYPE = 0,

@@ -80,6 +80,7 @@ static struct tracer_flags dummy_tracer_flags = {
 	.opts = dummy_tracer_opt
 };
 
+static bool forbidden_run = false; //added by nubia
 static int
 dummy_set_flag(struct trace_array *tr, u32 old_flags, u32 bit, int set)
 {
@@ -6675,6 +6676,10 @@ rb_simple_read(struct file *filp, char __user *ubuf,
 	r = tracer_tracing_is_on(tr);
 	r = sprintf(buf, "%d\n", r);
 
+	//ioctl to set ftrace_run
+	if(forbidden_run == true)
+		r = sprintf(buf, "%d\n", 2);
+    
 	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
 }
 
@@ -6692,6 +6697,11 @@ rb_simple_write(struct file *filp, const char __user *ubuf,
 		return ret;
 
 	if (buffer) {
+		//ioctl to set ftrace_run
+		if(forbidden_run == true){
+			val = 0;
+		}
+ 
 		mutex_lock(&trace_types_lock);
 		if (!!val == tracer_tracing_is_on(tr)) {
 			val = 0; /* do nothing */
@@ -6712,10 +6722,48 @@ rb_simple_write(struct file *filp, const char __user *ubuf,
 	return cnt;
 }
 
+static int ftrace_ioc_run(struct file *filp, unsigned long arg){
+    struct ftrace_run ioc_run;
+    
+    if (copy_from_user(&ioc_run, (struct ftrace_run __user *)arg,
+			    sizeof(ioc_run)))
+        return -EFAULT;
+
+    if (ioc_run.run == false){
+        forbidden_run = true;
+        ioc_run.status = 0;
+        if(tracing_is_on() == 1) {
+            tracing_off();
+            tracing_resize_ring_buffer(&global_trace, 0, RING_BUFFER_ALL_CPUS);
+        }
+    }else{
+        forbidden_run = false;
+        ioc_run.status = 1;
+    }
+
+    if (copy_to_user((struct ftrace_run __user *)arg, &ioc_run,
+            sizeof(ioc_run)))
+        return -EFAULT;
+
+    return 0;
+}
+
+long ftrace_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case FTRACE_IOC_RUN:
+		return ftrace_ioc_run(filp, arg);
+	default:
+		return -ENOTTY;
+	}
+}
+
+
 static const struct file_operations rb_simple_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= rb_simple_read,
 	.write		= rb_simple_write,
+	.unlocked_ioctl	= ftrace_ioctl,
 	.release	= tracing_release_generic_tr,
 	.llseek		= default_llseek,
 };
@@ -7000,6 +7048,10 @@ init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 			  &trace_clock_fops);
 
 	trace_create_file("tracing_on", 0644, d_tracer,
+			  tr, &rb_simple_fops);
+
+    /*NUBIA add for disable systrace during running benchmark*/
+	trace_create_file("tracing_on_bm", 0644, d_tracer,
 			  tr, &rb_simple_fops);
 
 	create_trace_options_dir(tr);
