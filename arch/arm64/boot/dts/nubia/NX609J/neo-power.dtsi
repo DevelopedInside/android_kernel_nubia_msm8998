@@ -1,0 +1,116 @@
+
+&mtp_batterydata {
+	qcom,batt-id-range-pct = <15>;
+	#include "fg-gen3-batterydata-scud-3800mah-step.dtsi"
+};
+
+&soc {
+	wp502x-charger {
+		compatible = "wp502x,charger";
+		wp502x,fastchg-irq-gpio = <&pmi8998_gpios 3 0x00>;
+		wp502x,fastchg-en-gpio = <&pmi8998_gpios 6 0x00>;
+		wp502x,i2c-sda-gpio = <&pmi8998_gpios 11 0x00>;
+		wp502x,i2c-scl-gpio = <&pmi8998_gpios 1 0x00>;
+		wp502x,idetify-threshold = <80>;
+		wp502x,pcba-resistance = <20>;
+		wp502x,support-current-threshold = <(-1200)>;
+		wp502x,bat-temp-limit-threshold = <400>;
+		wp502x,bat-clod-limit-threshold = <150>;
+		wp502x,bat-cool-limit-threshold = <100>;
+		wp502x,bat-hot-limit-threshold = <440>;
+		wp502x,fastchg-max-ma = <3200>;
+	};
+};
+
+&pmi8998_gpios {
+	/* GPIO 3 for direct charger irq signal */
+	gpio@c200 {
+		status = "okay";
+		qcom,mode = <0>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <0>;
+		qcom,pull = <4>;
+		qcom,master-en = <1>;
+	};
+	/* GPIO 6 for direct charger control signal */
+	gpio@c500 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <1>;
+		qcom,master-en = <1>;
+	};
+	/* GPIO 1 for direct charger i2c scl signal */
+	gpio@c000 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <1>;
+		qcom,pull = <0>;
+		qcom,master-en = <1>;
+	};
+	/* GPIO 11 for direct charger i2c sda signal */
+	gpio@ca00 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <0>;
+		qcom,invert = <1>;
+		qcom,pull = <0>;
+		qcom,master-en = <1>;
+	};
+};
+
+&pmi8998_charger{
+	/*BEGIN:Added neo power feature */
+	qcom,apsd_cc_trigger_disable;
+	qcom,usb-audio-select-support;
+	qcom,switch-en-gpio = <&tlmm 23 0>;
+	qcom,mbhc-int-gpio = <&tlmm 24 0>;
+	qcom,switch-select-gpio = <&tlmm 78 0>;
+	qcom,bat-temp-limit-support;
+	qcom,bat-temp-limit-current = <1000000>;
+	qcom,bat-temp-jeita-current = <250000>;
+	qcom,bat-temp-jeita-cool-low-current = <720000>;
+	qcom,bat-temp-limit-threshold = <400>;
+	qcom,bat-temp-limit-voltage = <4100>;
+	/*END*/
+	//qcom,step-soc-thresholds = <60 70 80 90>;
+	//qcom,step-current-deltas = <500000 500000 0 0 0>;
+	qcom,fcc-max-ua = <2500000>;
+	qcom,fv-max-uv = <4400000>;
+	qcom,usb-icl-ua = <2000000>;
+};
+
+&pmi8998_fg {
+	qcom,fg-recharge-soc-thr = <99>;
+	qcom,fg-recharge-voltage = <4340>;
+	qcom,battery-thermal-coefficients = [cc 50 ff];
+	qcom,fg-jeita-thresholds = <0 15 44 50>;
+	qcom,fg-jeita-hyst-temp = <2>;
+	qcom,fg-chg-term-current = <200>;
+	qcom,fg-sys-term-current = <(-250)>;
+	qcom,fg-force-load-profile;
+	qcom,hold-soc-while-full;
+	qcom,cycle-counter-en;
+	qcom,fg-empty-voltage = <3400>;
+	nubia,use-default-batt-id = <15>;
+};
+
+&spmi_bus {
+	qcom,pmi8998@2 {
+		neo,battery {
+			compatible = "nubia,neo-battery";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x1000 0x700>;
+			neo,batt-capacity-uah = <3800000>;
+			neo,batt-cutoff-mv = <3450>;
+			neo,batt-soc-increase-per-sec = <10>;
+			neo,batt-soc-decrease-per-sec = <60>;
+		};
+	};
+};

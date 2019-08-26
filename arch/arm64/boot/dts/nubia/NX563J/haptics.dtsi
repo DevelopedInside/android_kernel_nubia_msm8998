@@ -1,0 +1,30 @@
+
+&i2c_7 {
+        status = "okay";
+        ti@5a{
+                compatible = "ti,drv2605";
+                reg = <0x5a>;
+                pinctrl-names = "active","suspend";
+                pinctrl-0 = <&drv2605_power_active>;
+                pinctrl-1 = <&drv2605_power_suspend>;
+                ti,enable-gpio=<&tlmm 95 0x0>;
+        };
+};
+&tlmm {
+        drv2605_power_pin{
+                pins = "gpio95";
+                qcom,num-grp-pins = <1>;
+                qcom,pin-func = <0>;
+                label = "drv2605_power_pin";
+                drv2605_power_active: active {
+                        drive-strength = <6>;
+                        bias-pull-up;
+                        output-high;
+                };
+                drv2605_power_suspend: suspend {
+                        drive-strength = <6>;
+                        bias-pull-down;
+                        output-low;
+                };
+        };
+};

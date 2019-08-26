@@ -1,0 +1,193 @@
+
+&tlmm {
+        ir_remote_power_pin{
+            pins = "gpio39";
+            qcom,num-grp-pins = <1>;
+            qcom,pin-func = <0>;
+            label = "ir_remote_power_pin";
+            ir_remote_power_active: active {
+                drive-strength = <6>;
+                bias-pull-up;
+                output-high;
+            };
+            ir_remote_power_suspend: suspend {
+                drive-strength = <6>;
+                bias-pull-down;
+                output-low;
+            };
+        };
+
+        /* Nubia begin feature add uart ir dts */
+        uart_ir_active: uart_ir_active {
+                mux {
+                        pins = "gpio49", "gpio50";
+                        function = "blsp_uart9_a";
+                };
+
+                config {
+                        pins = "gpio49", "gpio50";
+                        drive-strength = <2>;
+                        bias-disable;
+                };
+        };
+        uart_ir_sleep: uart_ir_sleep {
+                mux {
+                        pins = "gpio49", "gpio50";
+                        function = "gpio";
+                };
+                config {
+                        pins = "gpio49", "gpio50";
+                        drive-strength = <2>;
+                        bias-pull-down;
+                        output-low;
+                };
+        };
+        /* Nubia end 2017.9.21 */
+
+        /* Nubia begin feature sensor add */
+        pa224_int {
+            pa224_default: pa224_default{
+                mux {
+                    pins = "gpio62";
+                    function = "gpio";
+                };
+                config {
+                    pins = "gpio62";
+                    drive-strength = <6>;
+                    bias-pull-up;
+                };
+            };
+            pa224_sleep: pa224_sleep{
+                mux {
+                    pins = "gpio62";
+                    function = "gpio";
+                };
+                config {
+                    pins = "gpio62";
+                    drive-strength = <6>;
+                    bias-high-impedance;
+                };
+            };
+        };
+        hall_int_0_pin{
+            hall_int_0_default: hall_int_0_default {
+             mux {
+                    pins = "gpio123","gpio124";
+                    function = "gpio";
+                };
+            config {
+                pins="gpio123","gpio124";
+                drive-strength = <6>;
+                bias-pull-up;
+                };
+            };
+
+            hall_int_0_sleep: hall_int_0_sleep {
+             mux {
+                    pins = "gpio123","gpio124";
+                    function = "gpio";
+                };
+            config{
+                pins= "gpio123","gpio124";
+                drive-strength = <6>;
+                bias-high-impedance;
+                };
+            };
+        };
+        /* Nubia end 2017.9.21 */
+};
+
+/* nubia nx563j begin feature add sensor dts */
+&i2c_7 {
+        status = "okay";
+        ir_remote_i_three@11 {
+                status = "okay";
+                reg = <0x11>;
+                compatible = "uei,i_three";
+                //vdd-supply = <&pm8994_l17>;
+                pinctrl-names = "active", "suspend";
+                pinctrl-0 = <&ir_remote_power_active>;
+                pinctrl-1 = <&ir_remote_power_suspend>;
+                ir_remote,enable-gpio = <&tlmm 39 0x0>;
+        };
+        rohm@38 {
+                compatible = "rohm,bh1745";
+                reg = <0x38>;
+                vdd-supply = <&pm8998_l19>;
+                vio-supply = <&pm8998_s4>;
+                bh1745,tp_moudle_count = <3>;
+                /*[module_id] [golden judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                bh1745,cal_data0 = "0","162","500","270","1832","1648","0","0",
+                /*[white judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "184","166","111","531","460","0","0",
+                /*[balck judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "313","1151","1532","5957","8584","0","0",
+                /*[blue judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "265","547","351","2337","1923","0","0";
+                /*[module_id] [golden judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                bh1745,cal_data1 = "1","242","1565","932","9035","8607","0","0",
+                /*[white judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "189","146","88","598","533","0","0",
+                /*[balck judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "1040","1911","310","11509","9976","0","0",
+                /*[blue judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "265","547","351","2337","1923","0","0";
+                /*[module_id] [golden judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                bh1745,cal_data2 = "2","199","488","274","2283","2068","0","0",
+                /*[white judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "194","216","113","886","821","0","0",
+                /*[balck judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "396","2301","547","13243","12687","0","0",
+                /*[blue judge] r[0] r[1] g[0] g[1] b[0] b[1]*/
+                "265","547","351","2337","1923","0","0";
+        };
+        txc@1e {
+                compatible = "txc,pa224";
+                reg = <0x1e>;
+                interrupt-parent = <&tlmm>;
+                interrupts = <62 0x2>;
+                vdd-supply = <&pm8998_l19>;
+                vio-supply = <&pm8998_s4>;
+                txc,irq-gpio = <&tlmm 62 0x2002>;
+                txc,ps_threshold_low = <30>;
+                txc,ps_threshold_high = <120>;
+                pinctrl-names = "pa224_default","pa224_sleep";
+                pinctrl-0 = <&pa224_default>;
+                pinctrl-1 =<&pa224_sleep>;
+                txc,vdd-always-on = <1>;
+        };
+};
+
+&soc {
+
+        /* nubia begin feature add hall */
+        hall_device_out {
+                compatible = "nubia,hall_device";
+                status = "okay";
+                pinctrl-names = "hall_default","hall_sleep";
+                pinctrl-0 = <&hall_int_0_default >;
+                pinctrl-1 = <&hall_int_0_sleep >;
+                vdd-supply = <&pm8998_lvs2>;
+                interrupt-parent = <&tlmm>;
+                hall_device,hw_device_count = <2>;
+                hall_device,irq-gpio-0 = <&tlmm 124 0x2002>;
+                hall_device,irq-gpio-1 = <&tlmm 123 0x2002>;
+        };
+};
+
+/*Nubia begin feature add uart dts */
+&uartblsp2dm1 {
+        status = "ok";
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart_console_active>;
+};
+/* Nubia end 2017.9.21 */
+
+/*Nubia begin feature add uart dts */
+&uartblsp2dm2 {
+        status = "ok";
+        pinctrl-names = "sleep", "default";
+        pinctrl-0 = <&uart_ir_sleep>;
+        pinctrl-1 = <&uart_ir_active>;
+};
+/* Nubia end 2017.9.21 */

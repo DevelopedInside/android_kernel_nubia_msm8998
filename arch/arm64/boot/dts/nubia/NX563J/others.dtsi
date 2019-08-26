@@ -1,0 +1,97 @@
+/*
+ * nubia overwrite dts
+ */
+ &soc {
+	nubia_hw_ver_gpio: nubia_hw_gpio_ctrl {
+	   compatible = "qcom,nubia_hw_gpio_ctrl";
+	   qcom,pcb-gpio1 = <&tlmm 99 0>;
+	   qcom,pcb-gpio2 = <&tlmm 100 0>;
+	   qcom,rf-gpio1 = <&tlmm  127 0>;
+	   qcom,rf-gpio2 = <&tlmm 128 0>;
+	   qcom,config-gpio1 = <&tlmm 59 0>;
+	   qcom,config-gpio2 = <&tlmm 60 0>;
+	   pinctrl-names = "pull_up_default","pull_down_default";
+	   pinctrl-0 = <&nubia_gpio_default>;
+	   pinctrl-1 = <&nubia_gpio_pulldown>;
+   };
+
+
+    keyreset {
+        compatible = "nubia,keyreset";
+        keys-down = <0x73 0x72>;
+        keys-up = <0x73 0x72>;
+        keyreset-need-panic;
+        key_down_delay = <20>;
+	};
+
+};
+&tlmm {
+   nubia_gpio {
+		   nubia_gpio_default: nubia_gpio_default{
+				   mux {
+						   pins = "gpio59", "gpio60", "gpio99", "gpio100", "gpio127", "gpio128";
+						   function = "gpio";
+				   };
+
+				   config {
+						   pins = "gpio59", "gpio60", "gpio99", "gpio100", "gpio127", "gpio128";
+						   drive-strength = <2>; /* 2 mA */
+						   bias-pull-up; /* pull up */
+						   input-enable;
+				   };
+		   };
+		   nubia_gpio_pulldown: nubia_gpio_pulldown{
+				   mux {
+						   pins = "gpio59", "gpio60", "gpio99", "gpio100", "gpio127", "gpio128";
+						   function = "gpio";
+				   };
+
+				   config {
+						   pins = "gpio59", "gpio60", "gpio99", "gpio100", "gpio127", "gpio128";
+						   drive-strength = <2>; /* 2 mA */
+						   bias-pull-down; /* pull down */
+						   input-enable;
+				   };
+		   };
+   };
+
+};
+
+/* pstore mem*/
+/ {
+	reserved-memory {
+		pstore_reserve_mem: pstore_reserve_mem_region@0 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0x0 0xAff00000 0x0 0x00100000>;
+			label = "pstore_reserve_mem";
+		};
+	};
+};
+
+&wdog {
+        qcom,bark-time = <20000>;
+        qcom,pet-time = <15000>;
+};
+&pm8998_rtc{
+	qcom,qpnp-rtc-alarm-pwrup = <1>;
+};
+&tlmm {
+	/delete-node/ wcd_usbc_analog_en1;
+	/delete-node/ wcd_usbc_analog_en2n;
+};
+
+&pmi8998_wled{
+	qcom,fs-curr-ua = <20000>;
+	qcom,en-cabc;
+	qcom,led-strings-list = [00 01];
+};
+
+&firmware{
+	android{
+		fstab{
+			/delete-node/ vendor;
+		};
+	};
+};

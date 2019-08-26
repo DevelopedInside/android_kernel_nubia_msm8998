@@ -1,0 +1,129 @@
+&i2c_6 { /* BLSP1 QUP6 (NFC) */
+	status = "okay";
+	nq@28 {
+	status = "disabled";
+	};
+
+	// add by slv for nfc-bcm20797
+	broadcom_bcm2079x_nfc@76{
+		compatible = "broadcom,bcm2079x_nfc";
+		reg = <0x76>;
+		broadcom,irq-gpio = <&tlmm 92 0x00>;
+		broadcom,en-gpio = <&tlmm 12 0x00>;
+		broadcom,wake-gpio = <&tlmm 76 0x00>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <92 0>;
+		interrupt-names = "BRCM_NFC_INT";
+		pinctrl-names = "bcm2079x_pin_active","bcm2079x_pin_suspend";
+		pinctrl-0 = <&bcm2079x_int_active &bcm2079x_en_active &bcm2079x_ctl_active>;
+		pinctrl-1 = <&bcm2079x_int_suspend &bcm2079x_en_suspend &bcm2079x_ctl_suspend>;
+		//status = "ok";
+		broadcom,clk-gpio = <&pm8998_gpios 21 0x00>;
+		clocks = <&clock_gcc clk_ln_bb_clk3_pin>;
+		clock-names = "ref_clk";
+	};
+
+};
+
+&tlmm {
+
+	//add by slv for nfc brcm2079x
+            bcm2079x_int_pin{
+				label = "bcm2079x_int_pin";
+				bcm2079x_int_active: active{
+				// active state
+				mux {
+					// GPIO 92 NFC Read Interrupt
+					pins = "gpio92";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio92";
+					drive-strength = <6>; // 6 MA
+					bias-pull-up;
+					};
+				};
+
+				bcm2079x_int_suspend: suspend{
+					// sleep state
+					mux {
+						// GPIO 92 NFC Read Interrupt
+						pins = "gpio92";
+						function = "gpio";
+					};
+
+					config {
+						pins = "gpio92";
+						drive-strength = <6>; // 6 MA
+						bias-pull-up;
+					};
+				};
+           };
+
+            bcm2079x_en_pin{
+				label = "bcm2079x_en_pin";
+                bcm2079x_en_active: active{
+				// active state
+					mux {
+						// GPIO 92 NFC Read Interrupt
+						pins = "gpio12";
+						function = "gpio";
+					};
+
+					config {
+						pins = "gpio12";
+						drive-strength = <6>; // 6 MA
+						bias-pull-up;
+					};
+				};
+
+				bcm2079x_en_suspend: suspend {
+					// sleep state
+					mux {
+						// GPIO 92 NFC Read Interrupt
+						pins = "gpio12";
+						function = "gpio";
+					};
+
+					config {
+						pins = "gpio12";
+						drive-strength = <6>; // 6 MA
+						bias-pull-up;
+					};
+				};
+            };
+
+            bcm2079x_ctl_pin{
+				label = "bcm2079x_ctl_pin";
+                bcm2079x_ctl_active: active{
+					// active state
+					mux {
+						// GPIO 92 NFC Read Interrupt
+						pins = "gpio76";
+						function = "gpio";
+					};
+
+					config {
+						pins = "gpio76";
+						drive-strength = <6>; // 6 MA
+						bias-pull-up;
+					};
+				};
+
+				bcm2079x_ctl_suspend: suspend {
+					// sleep state
+					mux {
+						// GPIO 92 NFC Read Interrupt
+						pins = "gpio76";
+						function = "gpio";
+					};
+
+					config {
+						pins = "gpio76";
+						drive-strength = <6>; // 6 MA
+						bias-pull-up;
+					};
+				};
+            };
+		};
