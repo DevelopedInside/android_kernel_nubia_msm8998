@@ -28,8 +28,9 @@
 #include <soc/qcom/qseecomi.h>
 
 /* QSEE_LOG_BUF_SIZE = 32K */
-#define QSEE_LOG_BUF_SIZE 0x8000
-
+//#define QSEE_LOG_BUF_SIZE 0x8000
+/* QSEE_LOG_BUF_SIZE =256K */
+#define QSEE_LOG_BUF_SIZE 0x40000
 
 /* TZ Diagnostic Area legacy version number */
 #define TZBSP_DIAG_MAJOR_VERSION_LEGACY	2
