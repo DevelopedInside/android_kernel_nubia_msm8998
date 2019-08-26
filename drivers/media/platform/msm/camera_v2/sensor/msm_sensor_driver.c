@@ -30,6 +30,8 @@ static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev);
 /* Static declaration */
 static struct msm_sensor_ctrl_t *g_sctrl[MAX_CAMERAS];
 
+//zhouruoyu add for hi846 otp
+extern int32_t hi846_otp_func(struct msm_sensor_ctrl_t *s_ctrl);
 static int msm_sensor_platform_remove(struct platform_device *pdev)
 {
 	struct msm_sensor_ctrl_t  *s_ctrl;
@@ -719,6 +721,10 @@ static void msm_sensor_fill_sensor_info(struct msm_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensordata->sensor_info->modes_supported;
 	sensor_info->position =
 		s_ctrl->sensordata->sensor_info->position;
+	//ZTEMT: zhouruoyu add for module compat --- start
+	sensor_info->module_id =
+		s_ctrl->sensordata->sensor_info->module_id;
+	//ZTEMT: zhouruoyu add for module compat --- end
 
 	strlcpy(entity_name, s_ctrl->msm_sd.sd.entity.name, MAX_SENSOR_NAME);
 }
@@ -1046,6 +1052,21 @@ CSID_TG:
 	}
 
 	pr_err("%s probe succeeded", slave_info->sensor_name);
+
+	//zhouruoyu add for hi846 otp --- start
+	if (strcmp(slave_info->sensor_name, "hi846") == 0)
+	{
+		pr_err("hi846 otp_func begin");
+		rc = hi846_otp_func(s_ctrl);
+		if ( rc < 0)
+		{
+			pr_err("hi846_otp_func failed");
+			//goto camera_power_down;
+		} else {
+			pr_err("%s hi846_otp_func succeeded", __func__);
+		}
+	}
+	//zhouruoyu add for hi846 otp --- end
 
 	s_ctrl->bypass_video_node_creation =
 		slave_info->bypass_video_node_creation;

@@ -25,6 +25,13 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
+/*ZTEMT: fengxun add for dual camera--------Start*/
+extern int imx362_state;
+extern int imx318_state;
+extern int ov5675_main_state;
+extern int ov5675_aux_state;
+/*ZTEMT: fengxun add for dual camera--------End*/
+
 int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 	int num_vreg, struct msm_sensor_power_setting *power_setting,
 	uint16_t power_setting_size)
@@ -1464,7 +1471,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 		switch (power_setting->seq_type) {
 		case SENSOR_CLK:
 			if (power_setting->seq_val >= ctrl->clk_info_size) {
-				pr_err("%s clk index %d >= max %zu\n", __func__,
+				pr_err_ratelimited("%s clk index %d >= max %zu\n", __func__,
 					power_setting->seq_val,
 					ctrl->clk_info_size);
 				goto power_up_failed;
@@ -1476,7 +1483,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 				ctrl->clk_info, ctrl->clk_ptr,
 				ctrl->clk_info_size, true);
 			if (rc < 0) {
-				pr_err("%s: clk enable failed\n", __func__);
+				pr_err_ratelimited("%s: clk enable failed\n", __func__);
 				goto power_up_failed;
 			}
 			break;
@@ -1559,7 +1566,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 	CDBG("%s exit\n", __func__);
 	return 0;
 power_up_failed:
-	pr_err("%s:%d failed\n", __func__, __LINE__);
+	pr_err_ratelimited("%s:%d failed\n", __func__, __LINE__);
 	for (index--; index >= 0; index--) {
 		CDBG("%s index %d\n", __func__, index);
 		power_setting = &ctrl->power_setting[index];
@@ -1682,10 +1689,17 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 			if (!ctrl->gpio_conf->gpio_num_info->valid
 				[pd->seq_val])
 				continue;
-			gpio_set_value_cansleep(
-				ctrl->gpio_conf->gpio_num_info->gpio_num
-				[pd->seq_val],
-				(int) pd->config_val);
+			/*ZTEMT: fengxun add for dual camera--------Start*/
+			if((imx362_state == 1)&&(imx318_state == 1)&&((pd->seq_val == SENSOR_GPIO_VANA)
+				||(pd->seq_val == SENSOR_GPIO_VAF))) {
+				break;
+			} else {
+				gpio_set_value_cansleep(
+					ctrl->gpio_conf->gpio_num_info->gpio_num
+					[pd->seq_val],
+					(int) pd->config_val);
+			}
+			/*ZTEMT: fengxun add for dualcamera--------End*/
 			break;
 		case SENSOR_VREG:
 			if (pd->seq_val == INVALID_VREG)
@@ -1715,11 +1729,21 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 			} else
 				pr_err("%s error in power up/down seq data\n",
 								__func__);
-			ret = msm_cam_sensor_handle_reg_gpio(pd->seq_val,
-				ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
-			if (ret < 0)
-				pr_err("ERR:%s Error while disabling VREG GPIO\n",
-					__func__);
+			/*ZTEMT: fengxun add for dualcamera--------Start*/
+			if((imx362_state == 1)&&(imx318_state == 1)&&((pd->seq_val == CAM_VIO)
+				||(pd->seq_val == CAM_VDIG)||(pd->seq_val == CAM_VANA))){
+				break;
+			} else if ((ov5675_main_state == 1)&&(ov5675_aux_state == 1)
+				&&(pd->seq_val == CAM_VANA)){
+				break;
+			} else {
+				ret = msm_cam_sensor_handle_reg_gpio(pd->seq_val,
+					ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
+				if (ret < 0)
+					pr_err("ERR:%s Error while disabling VREG GPIO\n",
+						__func__);
+			}
+			/*ZTEMT: fengxun add for dualcamera--------End*/
 			break;
 		case SENSOR_I2C_MUX:
 			if (ctrl->i2c_conf && ctrl->i2c_conf->use_i2c_mux)
