@@ -65,4 +65,9 @@ CONFIG_NUBIA_LINK_PM=y
 #add for pstore
 CONFIG_NUBIA_READ_CONSOLE=y
 
+# Nubia option  --Add by Cyborg2017(Cyborg Yang) [20190826]
+# CONFIG_MACH_NUBIA_NX563J is not set
+# CONFIG_MACH_NUBIA_NX595J is not set
+CONFIG_MACH_NUBIA_NX609J=y
+
 

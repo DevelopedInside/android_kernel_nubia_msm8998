@@ -67,3 +67,8 @@ CONFIG_BCM2079X_I2C=y
 #add for pstore
 CONFIG_NUBIA_READ_CONSOLE=y
 
+# Nubia option  --Add by Cyborg2017(Cyborg Yang) [20190826]
+CONFIG_MACH_NUBIA_NX563J=y
+# CONFIG_MACH_NUBIA_NX595J is not set
+# CONFIG_MACH_NUBIA_NX609J is not set
+
