@@ -59,20 +59,30 @@ enum print_reason {
 #define SW_QC3_VOTER			"SW_QC3_VOTER"
 #define AICL_RERUN_VOTER		"AICL_RERUN_VOTER"
 #define LEGACY_UNKNOWN_VOTER		"LEGACY_UNKNOWN_VOTER"
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+#define APSD_RERUN_VOTER		"APSD_RERUN_VOTER"
+#endif
 #define CC2_WA_VOTER			"CC2_WA_VOTER"
 #define QNOVO_VOTER			"QNOVO_VOTER"
 #define BATT_PROFILE_VOTER		"BATT_PROFILE_VOTER"
 #define OTG_DELAY_VOTER			"OTG_DELAY_VOTER"
 #define USBIN_I_VOTER			"USBIN_I_VOTER"
+#if !defined(CONFIG_NUBIA_CHARGE_FEATURE)
 #define WEAK_CHARGER_VOTER		"WEAK_CHARGER_VOTER"
+#endif
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+#define DC_USBIN_VOTER			"DC_USBIN_VOTER"
+#endif
 #define WBC_VOTER			"WBC_VOTER"
 #define OV_VOTER			"OV_VOTER"
 #define FCC_STEPPER_VOTER		"FCC_STEPPER_VOTER"
 
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
+#if !defined(CONFIG_NUBIA_CHARGE_FEATURE)
 #define BOOST_BACK_STORM_COUNT	3
 #define WEAK_CHG_STORM_COUNT	8
+#endif
 
 enum smb_mode {
 	PARALLEL_MASTER = 0,
@@ -206,6 +216,11 @@ struct smb_params {
 	struct smb_chg_param	dc_icl_div2_mid_hv;
 	struct smb_chg_param	dc_icl_div2_hv;
 	struct smb_chg_param	jeita_cc_comp;
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	struct smb_chg_param	step_soc_threshold[4];
+	struct smb_chg_param	step_soc;
+	struct smb_chg_param	step_cc_delta[5];
+#endif
 	struct smb_chg_param	freq_buck;
 	struct smb_chg_param	freq_boost;
 };
@@ -247,7 +262,9 @@ struct smb_charger {
 	struct smb_chg_freq	chg_freq;
 	int			smb_version;
 	int			otg_delay_ms;
+#if !defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	int			*weak_chg_icl_ua;
+#endif
 
 	/* locks */
 	struct mutex		lock;
@@ -263,6 +280,9 @@ struct smb_charger {
 	struct power_supply		*bms_psy;
 	struct power_supply_desc	usb_psy_desc;
 	struct power_supply		*usb_main_psy;
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+	struct power_supply		*direct_psy;
+#endif
 	struct power_supply		*usb_port_psy;
 	enum power_supply_type		real_charger_type;
 
@@ -295,12 +315,19 @@ struct smb_charger {
 	struct votable		*hvdcp_hw_inov_dis_votable;
 	struct votable		*usb_irq_enable_votable;
 	struct votable		*typec_irq_disable_votable;
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+	struct votable		*apsd_rerun_votable;
+	struct votable		*direct_chg_enable_votable;
+#endif
 
 	/* work */
 	struct work_struct	bms_update_work;
 	struct work_struct	rdstd_cc2_detach_work;
 	struct delayed_work	hvdcp_detect_work;
 	struct delayed_work	ps_change_timeout_work;
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	struct delayed_work	step_soc_req_work;
+#endif
 	struct delayed_work	clear_hdc_work;
 	struct work_struct	otg_oc_work;
 	struct work_struct	vconn_oc_work;
@@ -321,6 +348,40 @@ struct smb_charger {
 	int			thermal_levels;
 	int			*thermal_mitigation;
 	int			dcp_icl_ua;
+
+#if defined(CONFIG_TYPEC_AUDIO_ADAPTER_SWITCH)
+	int			usb_audio_select_supported;
+	int			switch_en;
+	int			switch_select;
+	int			mbhc_int;
+#endif
+
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	bool 		bat_temp_limit_support;
+	int 		bat_temp_limit_mask;
+	int 		bat_temp_limit_current;
+	int 		bat_temp_jeita_current;
+	int 		bat_temp_jeita_cool_low_current;
+	int			bat_temp_limit_threshold;
+	int 		bat_temp_limit_voltage;
+	struct delayed_work	 	typec_disable_cmd_work;
+	struct delayed_work	 	thermal_monitor_work;
+	struct delayed_work		jeita_fcv_monitor_work;
+	struct notifier_block 	fb_notifier;
+	int			*step_soc_threshold;
+	int			*step_cc_delta;
+	bool		apsd_cc_trigger_disable;
+#endif
+
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+#define	PMI_GPIO3_STATUS		0xc208
+#define PMI_GPIO3_VAL_MASK		BIT(0)
+#define	PMI_GPIO6_DIG_OUT_CTL	0xc544
+#define PMI_GPIO6_DIG_OUT_MASK	BIT(7)
+	bool		direct_irq_disabled;
+	struct delayed_work  	rerun_aicl_work;
+#endif
+
 	int			fake_capacity;
 	bool			step_chg_enabled;
 	bool			sw_jeita_enabled;
@@ -403,10 +464,18 @@ int smblib_vconn_regulator_is_enabled(struct regulator_dev *rdev);
 irqreturn_t smblib_handle_debug(int irq, void *data);
 irqreturn_t smblib_handle_otg_overcurrent(int irq, void *data);
 irqreturn_t smblib_handle_chg_state_change(int irq, void *data);
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+irqreturn_t smblib_handle_step_chg_state_change(int irq, void *data);
+irqreturn_t smblib_handle_step_chg_soc_update_fail(int irq, void *data);
+irqreturn_t smblib_handle_step_chg_soc_update_request(int irq, void *data);
+#endif
 irqreturn_t smblib_handle_batt_temp_changed(int irq, void *data);
 irqreturn_t smblib_handle_batt_psy_changed(int irq, void *data);
 irqreturn_t smblib_handle_usb_psy_changed(int irq, void *data);
 irqreturn_t smblib_handle_usbin_uv(int irq, void *data);
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+irqreturn_t smblib_handle_usbin_ov(int irq, void *data);
+#endif
 irqreturn_t smblib_handle_usb_plugin(int irq, void *data);
 irqreturn_t smblib_handle_usb_source_change(int irq, void *data);
 irqreturn_t smblib_handle_icl_change(int irq, void *data);
@@ -434,6 +503,14 @@ int smblib_get_prop_system_temp_level(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_input_current_limited(struct smb_charger *chg,
 				union power_supply_propval *val);
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+int smblib_get_prop_step_chg_step(struct smb_charger *chg,
+				union power_supply_propval *val);
+#endif
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+int smblib_set_prop_batt_status(struct smb_charger *chg,
+				const union power_supply_propval *val);
+#endif
 int smblib_set_prop_input_suspend(struct smb_charger *chg,
 				const union power_supply_propval *val);
 int smblib_set_prop_batt_capacity(struct smb_charger *chg,
@@ -527,7 +604,9 @@ int smblib_get_prop_from_bms(struct smb_charger *chg,
 int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 				const union power_supply_propval *val);
 void smblib_usb_typec_change(struct smb_charger *chg);
-
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+int smblib_config_step_charging(struct smb_charger *chg, int enable);
+#endif
 int smblib_init(struct smb_charger *chg);
 int smblib_deinit(struct smb_charger *chg);
 #endif /* __SMB2_CHARGER_H */
