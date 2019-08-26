@@ -2,7 +2,6 @@
  * nubia overwrite dts
  */
 
-
 #include "others.dtsi"
 #include "display.dtsi"
 #include "tp.dtsi"
