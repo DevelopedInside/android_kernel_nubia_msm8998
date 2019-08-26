@@ -123,6 +123,89 @@ static struct smb_params v1_params = {
 		.max_u	= 1575000,
 		.step_u	= 25000,
 	},
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	.step_soc_threshold[0]		= {
+		.name	= "step charge soc threshold 1",
+		.reg	= STEP_CHG_SOC_OR_BATT_V_TH1_REG,
+		.min_u	= 0,
+		.max_u	= 100,
+		.step_u	= 1,
+	},
+	.step_soc_threshold[1]		= {
+		.name	= "step charge soc threshold 2",
+		.reg	= STEP_CHG_SOC_OR_BATT_V_TH2_REG,
+		.min_u	= 0,
+		.max_u	= 100,
+		.step_u	= 1,
+	},
+	.step_soc_threshold[2]         = {
+		.name	= "step charge soc threshold 3",
+		.reg	= STEP_CHG_SOC_OR_BATT_V_TH3_REG,
+		.min_u	= 0,
+		.max_u	= 100,
+		.step_u	= 1,
+	},
+	.step_soc_threshold[3]         = {
+		.name	= "step charge soc threshold 4",
+		.reg	= STEP_CHG_SOC_OR_BATT_V_TH4_REG,
+		.min_u	= 0,
+		.max_u	= 100,
+		.step_u	= 1,
+	},
+	.step_soc			= {
+		.name	= "step charge soc",
+		.reg	= STEP_CHG_SOC_VBATT_V_REG,
+		.min_u	= 0,
+		.max_u	= 100,
+		.step_u	= 1,
+		.set_proc	= smblib_mapping_soc_from_field_value,
+	},
+	.step_cc_delta[0]	= {
+		.name	= "step charge current delta 1",
+		.reg	= STEP_CHG_CURRENT_DELTA1_REG,
+		.min_u	= 100000,
+		.max_u	= 3200000,
+		.step_u	= 100000,
+		.get_proc	= smblib_mapping_cc_delta_to_field_value,
+		.set_proc	= smblib_mapping_cc_delta_from_field_value,
+	},
+	.step_cc_delta[1]	= {
+		.name	= "step charge current delta 2",
+		.reg	= STEP_CHG_CURRENT_DELTA2_REG,
+		.min_u	= 100000,
+		.max_u	= 3200000,
+		.step_u	= 100000,
+		.get_proc	= smblib_mapping_cc_delta_to_field_value,
+		.set_proc	= smblib_mapping_cc_delta_from_field_value,
+	},
+	.step_cc_delta[2]	= {
+		.name	= "step charge current delta 3",
+		.reg	= STEP_CHG_CURRENT_DELTA3_REG,
+		.min_u	= 100000,
+		.max_u	= 3200000,
+		.step_u	= 100000,
+		.get_proc	= smblib_mapping_cc_delta_to_field_value,
+		.set_proc	= smblib_mapping_cc_delta_from_field_value,
+	},
+	.step_cc_delta[3]	= {
+		.name	= "step charge current delta 4",
+		.reg	= STEP_CHG_CURRENT_DELTA4_REG,
+		.min_u	= 100000,
+		.max_u	= 3200000,
+		.step_u	= 100000,
+		.get_proc	= smblib_mapping_cc_delta_to_field_value,
+		.set_proc	= smblib_mapping_cc_delta_from_field_value,
+	},
+	.step_cc_delta[4]	= {
+		.name	= "step charge current delta 5",
+		.reg	= STEP_CHG_CURRENT_DELTA5_REG,
+		.min_u	= 100000,
+		.max_u	= 3200000,
+		.step_u	= 100000,
+		.get_proc	= smblib_mapping_cc_delta_to_field_value,
+		.set_proc	= smblib_mapping_cc_delta_from_field_value,
+	},
+#endif
 	.freq_buck		= {
 		.name	= "buck switching frequency",
 		.reg	= CFG_BUCKBOOST_FREQ_SELECT_BUCK_REG,
@@ -163,6 +246,11 @@ struct smb_dt_props {
 	int	wipower_max_uw;
 	int	min_freq_khz;
 	int	max_freq_khz;
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+#define STEP_CHARGING_MAX_STEPS	5
+	u32	step_soc_threshold[STEP_CHARGING_MAX_STEPS - 1];
+	s32	step_cc_delta[STEP_CHARGING_MAX_STEPS];
+#endif
 	struct	device_node *revid_dev_node;
 	int	float_option;
 	int	chg_inhibit_thr_mv;
@@ -184,10 +272,12 @@ module_param_named(
 	debug_mask, __debug_mask, int, S_IRUSR | S_IWUSR
 );
 
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+#else
 static int __weak_chg_icl_ua = 500000;
 module_param_named(
 	weak_chg_icl_ua, __weak_chg_icl_ua, int, S_IRUSR | S_IWUSR);
-
+#endif
 static int __try_sink_enabled = 1;
 module_param_named(
 	try_sink_enabled, __try_sink_enabled, int, 0600
@@ -211,13 +301,38 @@ static int smb2_parse_dt(struct smb2 *chip)
 		pr_err("device tree node missing\n");
 		return -EINVAL;
 	}
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	chg->step_chg_enabled = false;
+	chg->step_soc_threshold = chip->dt.step_soc_threshold;
+	chg->step_cc_delta = chip->dt.step_cc_delta;
+
+	if (of_property_count_u32_elems(node, "qcom,step-soc-thresholds")
+			!= STEP_CHARGING_MAX_STEPS - 1)
+		chg->step_chg_enabled = false;
+
+	rc = of_property_read_u32_array(node, "qcom,step-soc-thresholds",
+			chip->dt.step_soc_threshold,
+			STEP_CHARGING_MAX_STEPS - 1);
+	if (rc < 0)
+		chg->step_chg_enabled = false;
+
+	if (of_property_count_u32_elems(node, "qcom,step-current-deltas")
+			!= STEP_CHARGING_MAX_STEPS)
+		chg->step_chg_enabled = false;
+
+	rc = of_property_read_u32_array(node, "qcom,step-current-deltas",
+			chip->dt.step_cc_delta,
+			STEP_CHARGING_MAX_STEPS);
+	if (rc < 0)
+		chg->step_chg_enabled = false;
+#else
 
 	chg->step_chg_enabled = of_property_read_bool(node,
 				"qcom,step-charging-enable");
 
 	chg->sw_jeita_enabled = of_property_read_bool(node,
 				"qcom,sw-jeita-enable");
-
+#endif
 	rc = of_property_read_u32(node, "qcom,wd-bark-time-secs",
 					&chip->dt.wd_bark_time);
 	if (rc < 0 || chip->dt.wd_bark_time < MIN_WD_BARK_TIME)
@@ -331,6 +446,55 @@ static int smb2_parse_dt(struct smb2 *chip)
 	return 0;
 }
 
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE) || defined(CONFIG_TYPEC_AUDIO_ADAPTER_SWITCH)
+#include <linux/of_gpio.h>
+static int smb2_pre_parse_dt(struct smb2 *chip)
+{
+	struct smb_charger *chg = &chip->chg;
+	struct device_node *node = chg->dev->of_node;
+	int rc;
+
+	if (!node) {
+		pr_err("device tree node missing\n");
+		return -EINVAL;
+	}
+	chg->apsd_cc_trigger_disable = of_property_read_bool(node,
+					"qcom,apsd_cc_trigger_disable");
+#if defined(CONFIG_TYPEC_AUDIO_ADAPTER_SWITCH)
+	chg->usb_audio_select_supported = of_property_read_bool(node,
+					"qcom,usb-audio-select-support");
+
+	chg->switch_en = of_get_named_gpio(node, "qcom,switch-en-gpio", 0);
+
+	chg->switch_select = of_get_named_gpio(node, "qcom,switch-select-gpio", 0);
+
+	chg->mbhc_int = of_get_named_gpio(node, "qcom,mbhc-int-gpio", 0);
+#endif
+	chg->bat_temp_limit_support = of_property_read_bool(node,
+					"qcom,bat-temp-limit-support");
+
+	of_property_read_u32(node, "qcom,bat-temp-limit-current",
+				&chg->bat_temp_limit_current);
+
+	of_property_read_u32(node, "qcom,bat-temp-jeita-current",
+				&chg->bat_temp_jeita_current);
+
+	rc =	of_property_read_u32(node, "qcom,bat-temp-jeita-cool-low-current",
+				&chg->bat_temp_jeita_cool_low_current);
+	if (rc < 0)
+		chg->bat_temp_jeita_cool_low_current = chg->bat_temp_jeita_current;
+	pr_err("chg->bat_temp_jeita_current:%d, chg->bat_temp_jeita_cool_low_current:%d\n",chg->bat_temp_jeita_current,chg->bat_temp_jeita_cool_low_current);
+	
+	of_property_read_u32(node, "qcom,bat-temp-limit-threshold",
+				&chg->bat_temp_limit_threshold);
+
+	of_property_read_u32(node, "qcom,bat-temp-limit-voltage",
+				&chg->bat_temp_limit_voltage);
+
+	return 0;
+}
+#endif
+
 /************************
  * USB PSY REGISTRATION *
  ************************/
@@ -377,7 +541,12 @@ static int smb2_usb_get_prop(struct power_supply *psy,
 			rc = smblib_get_prop_usb_present(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
+	#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+		rc = smblib_get_prop_usb_present(chg, val);
+	#else
 		rc = smblib_get_prop_usb_online(chg, val);
+	#endif
+
 		if (!val->intval)
 			break;
 
@@ -936,6 +1105,9 @@ static enum power_supply_property smb2_batt_props[] = {
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED,
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	POWER_SUPPLY_PROP_STEP_CHARGING_STEP,
+#endif
 	POWER_SUPPLY_PROP_SW_JEITA_ENABLED,
 	POWER_SUPPLY_PROP_CHARGE_DONE,
 	POWER_SUPPLY_PROP_PARALLEL_DISABLE,
@@ -998,6 +1170,11 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
 		val->intval = chg->step_chg_enabled;
 		break;
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	case POWER_SUPPLY_PROP_STEP_CHARGING_STEP:
+		rc = smblib_get_prop_step_chg_step(chg, val);
+		break;
+#endif
 	case POWER_SUPPLY_PROP_SW_JEITA_ENABLED:
 		val->intval = chg->sw_jeita_enabled;
 		break;
@@ -1120,9 +1297,15 @@ static int smb2_batt_set_prop(struct power_supply *psy,
 			vote(chg->fcc_votable, BATT_PROFILE_VOTER, false, 0);
 		}
 		break;
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
+		rc = smblib_config_step_charging(chg, val->intval);
+		break;
+#else
 	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
 		chg->step_chg_enabled = !!val->intval;
 		break;
+#endif
 	case POWER_SUPPLY_PROP_SW_JEITA_ENABLED:
 		if (chg->sw_jeita_enabled != (!!val->intval)) {
 			rc = smblib_disable_hw_jeita(chg, !!val->intval);
@@ -1163,6 +1346,9 @@ static int smb2_batt_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property psp)
 {
 	switch (psp) {
+#if defined(CONFIG_NEO_DIRECT_CHARGE_SUPPORT)
+	case POWER_SUPPLY_PROP_STATUS:
+#endif
 	case POWER_SUPPLY_PROP_INPUT_SUSPEND:
 	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
 	case POWER_SUPPLY_PROP_CAPACITY:
@@ -1182,7 +1368,11 @@ static int smb2_batt_prop_is_writeable(struct power_supply *psy,
 
 static const struct power_supply_desc batt_psy_desc = {
 	.name = "battery",
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	.type = POWER_SUPPLY_TYPE_MAINS,
+#else
 	.type = POWER_SUPPLY_TYPE_BATTERY,
+#endif
 	.properties = smb2_batt_props,
 	.num_properties = ARRAY_SIZE(smb2_batt_props),
 	.get_property = smb2_batt_get_prop,
@@ -1195,7 +1385,13 @@ static int smb2_init_batt_psy(struct smb2 *chip)
 	struct power_supply_config batt_cfg = {};
 	struct smb_charger *chg = &chip->chg;
 	int rc = 0;
-
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	static char *smb2_supplicants[] = {
+		"neo-battery",
+	};
+	batt_cfg.supplied_to = smb2_supplicants;
+	batt_cfg.num_supplicants = ARRAY_SIZE(smb2_supplicants);
+#endif
 	batt_cfg.drv_data = chg;
 	batt_cfg.of_node = chg->dev->of_node;
 	chg->batt_psy = power_supply_register(chg->dev,
@@ -1299,6 +1495,75 @@ static int smb2_init_vconn_regulator(struct smb2 *chip)
 /***************************
  * HARDWARE INITIALIZATION *
  ***************************/
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+static int smb2_config_step_charging(struct smb2 *chip)
+{
+	struct smb_charger *chg = &chip->chg;
+	int rc = 0;
+	int i;
+
+	if (!chg->step_chg_enabled)
+		return rc;
+
+	for (i = 0; i < STEP_CHARGING_MAX_STEPS - 1; i++) {
+		rc = smblib_set_charge_param(chg,
+					     &chg->param.step_soc_threshold[i],
+					     chip->dt.step_soc_threshold[i]);
+		if (rc < 0) {
+			pr_err("Couldn't configure soc thresholds rc = %d\n",
+				rc);
+			goto err_out;
+		}
+	}
+
+	for (i = 0; i < STEP_CHARGING_MAX_STEPS; i++) {
+		rc = smblib_set_charge_param(chg, &chg->param.step_cc_delta[i],
+					     chip->dt.step_cc_delta[i]);
+		if (rc < 0) {
+			pr_err("Couldn't configure cc delta rc = %d\n",
+				rc);
+			goto err_out;
+		}
+	}
+
+	rc = smblib_write(chg, STEP_CHG_UPDATE_REQUEST_TIMEOUT_CFG_REG,
+			  STEP_CHG_UPDATE_REQUEST_TIMEOUT_40S);
+	if (rc < 0) {
+		dev_err(chg->dev,
+			"Couldn't configure soc request timeout reg rc=%d\n",
+			 rc);
+		goto err_out;
+	}
+
+	rc = smblib_write(chg, STEP_CHG_UPDATE_FAIL_TIMEOUT_CFG_REG,
+			  STEP_CHG_UPDATE_FAIL_TIMEOUT_120S);
+	if (rc < 0) {
+		dev_err(chg->dev,
+			"Couldn't configure soc fail timeout reg rc=%d\n",
+			rc);
+		goto err_out;
+	}
+
+	/*
+	 *  enable step charging, source soc, standard mode, go to final
+	 *  state in case of failure.
+	 */
+	rc = smblib_write(chg, CHGR_STEP_CHG_MODE_CFG_REG,
+			       STEP_CHARGING_ENABLE_BIT |
+			       STEP_CHARGING_SOURCE_SELECT_BIT |
+			       STEP_CHARGING_SOC_FAIL_OPTION_BIT);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure charger rc=%d\n", rc);
+		goto err_out;
+	}
+
+	return 0;
+err_out:
+	chg->step_chg_enabled = false;
+	return rc;
+}
+#endif
+
 static int smb2_config_wipower_input_power(struct smb2 *chip, int uw)
 {
 	int rc;
@@ -1476,6 +1741,14 @@ static int smb2_init_hw(struct smb2 *chip)
 	int rc;
 	u8 stat, val;
 
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	rc = smblib_write(chg, HVDCP_PULSE_COUNT_MAX, HVDCP_DEFAULT_VALUE);
+	if (rc < 0) {
+		pr_err("Couldn't set default value to HVDCP_PULSE_COUNT_MAX, rc=%d\n", rc);
+		return rc;
+	}
+#endif
+
 	if (chip->dt.no_battery)
 		chg->fake_capacity = 50;
 
@@ -1565,11 +1838,43 @@ static int smb2_init_hw(struct smb2 *chip)
 			chg->micro_usb_mode, 0);
 	vote(chg->hvdcp_enable_votable, MICRO_USB_VOTER,
 			chg->micro_usb_mode, 0);
-
+#if defined(CONFIG_DIRECT_QC_COMPATIBLE_FEATURE)
+	vote(chg->hvdcp_disable_votable_indirect, DC_USBIN_VOTER, true, 0);
+#endif
 	/*
 	 * AICL configuration:
 	 * start from min and AICL ADC disable
 	 */
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	/* Parallel Charging on STAT Pin Condition */
+	rc = smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+                       SUSPEND_ON_COLLAPSE_USBIN_BIT | USBIN_AICL_RERUN_EN_BIT,
+                       USBIN_AICL_RERUN_EN_BIT);
+       if (rc < 0) {
+               dev_err(chg->dev, "Couldn't configure USBIN_AICL_OPTIONS_CFG_REG rc=%d\n", rc);
+               return rc;
+	}
+
+	rc = smblib_masked_write(chg, MISC_CFG_REG, BIT(3), 0);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure MISC_CFG_REG rc=%d\n", rc);
+		return rc;
+	}
+
+	rc = smblib_masked_write(chg, USBIN_LOAD_CFG_REG,
+			USBIN_INPUT_COLLAPSE, USBIN_INPUT_COLLAPSE);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure USBIN_LOAD_CFG_REG rc=%d\n", rc);
+		return rc;
+	}
+
+	rc = smblib_masked_write(chg, TYPE_C_CFG_REG, APSD_START_ON_CC_BIT, 0);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure TYPE_C_CFG_REG rc=%d\n", rc);
+		return rc;
+	}
+#endif
+
 	rc = smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 			USBIN_AICL_START_AT_MAX_BIT
 				| USBIN_AICL_ADC_EN_BIT, 0);
@@ -1645,6 +1950,16 @@ static int smb2_init_hw(struct smb2 *chip)
 		pr_err("Couldn't configue WD config rc=%d\n", rc);
 		return rc;
 	}
+
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	/* configure step charging */
+	rc = smb2_config_step_charging(chip);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure step charging rc=%d\n",
+			rc);
+		return rc;
+	}
+#endif
 
 	/* configure wipower watts */
 	rc = smb2_config_wipower_input_power(chip, chip->dt.wipower_max_uw);
@@ -1891,6 +2206,11 @@ static int smb2_determine_initial_status(struct smb2 *chip)
 	smblib_handle_usb_source_change(0, &irq_data);
 	smblib_handle_chg_state_change(0, &irq_data);
 	smblib_handle_icl_change(0, &irq_data);
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+	smblib_handle_step_chg_state_change(0, &irq_data);
+	smblib_handle_step_chg_soc_update_request(0, &irq_data);
+#endif
+
 	smblib_handle_batt_temp_changed(0, &irq_data);
 	smblib_handle_wdog_bark(0, &irq_data);
 
@@ -1914,15 +2234,30 @@ static struct smb_irq_info smb2_irqs[] = {
 	},
 	[STEP_CHG_STATE_CHANGE_IRQ] = {
 		.name		= "step-chg-state-change",
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+		.handler	= smblib_handle_step_chg_state_change,
+		.wake		= true,
+#else
 		.handler	= NULL,
+#endif
 	},
 	[STEP_CHG_SOC_UPDATE_FAIL_IRQ] = {
 		.name		= "step-chg-soc-update-fail",
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+		.handler	= smblib_handle_step_chg_soc_update_fail,
+		.wake		= true,
+#else
 		.handler	= NULL,
+#endif
 	},
 	[STEP_CHG_SOC_UPDATE_REQ_IRQ] = {
 		.name		= "step-chg-soc-update-request",
+#if defined(CONFIG_NUBIA_HW_STEP_CHARGE_FEATURE)
+		.handler	= smblib_handle_step_chg_soc_update_request,
+		.wake		= true,
+#else
 		.handler	= NULL,
+#endif
 	},
 /* OTG IRQs */
 	[OTG_FAIL_IRQ] = {
@@ -1982,7 +2317,11 @@ static struct smb_irq_info smb2_irqs[] = {
 	},
 	[USBIN_OV_IRQ] = {
 		.name		= "usbin-ov",
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+		.handler	= smblib_handle_usbin_ov,
+#else
 		.handler	= smblib_handle_debug,
+#endif
 	},
 	[USBIN_PLUGIN_IRQ] = {
 		.name		= "usbin-plugin",
@@ -2068,7 +2407,11 @@ static struct smb_irq_info smb2_irqs[] = {
 	[SWITCH_POWER_OK_IRQ] = {
 		.name		= "switcher-power-ok",
 		.handler	= smblib_handle_switcher_power_ok,
+	#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+		.storm_data	= {true, 1000, 3},
+	#else
 		.storm_data	= {true, 1000, 8},
+	#endif
 	},
 };
 
@@ -2264,8 +2607,9 @@ static int smb2_probe(struct platform_device *pdev)
 	chg->dev = &pdev->dev;
 	chg->param = v1_params;
 	chg->debug_mask = &__debug_mask;
-	chg->try_sink_enabled = &__try_sink_enabled;
+#if !defined(CONFIG_NUBIA_CHARGE_FEATURE)
 	chg->weak_chg_icl_ua = &__weak_chg_icl_ua;
+#endif
 	chg->mode = PARALLEL_MASTER;
 	chg->irq_info = smb2_irqs;
 	chg->name = "PMI";
@@ -2283,6 +2627,13 @@ static int smb2_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE) || defined(CONFIG_TYPEC_AUDIO_ADAPTER_SWITCH)
+	rc = smb2_pre_parse_dt(chip);
+	if (rc < 0) {
+		pr_err("Couldn't pre-parse dt. rc=%d\n", rc);
+		return rc;
+	}
+#endif
 	rc = smb2_parse_dt(chip);
 	if (rc < 0) {
 		pr_err("Couldn't parse device tree rc=%d\n", rc);

@@ -74,3 +74,6 @@ obj-$(CONFIG_AXP288_FUEL_GAUGE) += axp288_fuel_gauge.o
 obj-$(CONFIG_AXP288_CHARGER)	+= axp288_charger.o
 obj-$(CONFIG_ARCH_QCOM)		+= qcom/
 obj-$(CONFIG_POWER_SUPPLY)	+= supply/
+#Begin [0016004715 add the kernel power code,20180316]
+obj-$(CONFIG_ZTEMT_POWER_DEBUG)	+= ztemt_power_debug/
+#End   [0016004715 add the kernel power code,20180316]
