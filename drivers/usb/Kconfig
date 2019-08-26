@@ -19,6 +19,12 @@ config USB_EHCI_BIG_ENDIAN_MMIO
 config USB_EHCI_BIG_ENDIAN_DESC
 	bool
 
+config NUBIA_USB_MAXIMUM_SPEED_HIGH
+        bool "nubia usb maximum speed is high"
+        default n
+        help
+          nubia usb maximum speed is high.
+
 menuconfig USB_SUPPORT
 	bool "USB support"
 	depends on HAS_IOMEM
