@@ -33,6 +33,8 @@ int set_task_ioprio(struct task_struct *task, int ioprio)
 {
 	int err;
 	struct io_context *ioc;
+    //nubia delete for setting io priority
+    /*
 	const struct cred *cred = current_cred(), *tcred;
 
 	rcu_read_lock();
@@ -43,6 +45,8 @@ int set_task_ioprio(struct task_struct *task, int ioprio)
 		return -EPERM;
 	}
 	rcu_read_unlock();
+    */
+    //nubia delete end
 
 	err = security_task_setioprio(task, ioprio);
 	if (err)
@@ -70,8 +74,17 @@ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
 
 	switch (class) {
 		case IOPRIO_CLASS_RT:
+            //nubia add for setting io priority
+			if (!capable(CAP_SYS_ADMIN))
+                if (1000 != sys_getuid())
+				return -EPERM;
+            //nubia add end
+            //nubia delete for setting io priority
+            /*
 			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
+            */
+            //nubia delete end
 			/* fall through, rt has prio field too */
 		case IOPRIO_CLASS_BE:
 			if (data >= IOPRIO_BE_NR || data < 0)
