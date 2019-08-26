@@ -94,8 +94,11 @@
 		dai_mi2s0: qcom,msm-dai-q6-mi2s-prim {
 			compatible = "qcom,msm-dai-q6-mi2s";
 			qcom,msm-dai-q6-mi2s-dev-id = <0>;
-			qcom,msm-mi2s-rx-lines = <3>;
-			qcom,msm-mi2s-tx-lines = <0>;
+			qcom,msm-mi2s-rx-lines = <1>;
+			qcom,msm-mi2s-tx-lines = <2>;
+			pinctrl-names = "default", "sleep";
+			pinctrl-0 = <&pri_mi2s_sck_active &pri_mi2s_ws_active &pri_mi2s_sd0_active  &pri_mi2s_sd1_active>;
+			pinctrl-1 = <&pri_mi2s_sck_sleep &pri_mi2s_ws_sleep &pri_mi2s_sd0_sleep &pri_mi2s_sd1_sleep>;
 		};
 
 		dai_mi2s1: qcom,msm-dai-q6-mi2s-sec {

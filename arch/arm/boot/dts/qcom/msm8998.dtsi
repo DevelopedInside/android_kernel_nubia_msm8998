@@ -37,6 +37,12 @@
 		bootargs = "rcupdate.rcu_expedited=1";
 	};
 
+	/* Nubia begin feature add uart serial1 */
+	aliases {
+		serial1 = &uartblsp2dm2;
+	};
+	/* Nubia end 2017.9.21 */
+
 	cpus {
 		#address-cells = <2>;
 		#size-cells = <0>;
@@ -292,7 +298,7 @@
 					dev = "/dev/block/platform/soc/1da4000.ufshc/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,slotselect,verify";
+					fsmgr_flags = "wait,verify";
 					status = "ok";
 				};
 			};
@@ -491,6 +497,18 @@
 			 <&clock_gcc clk_gcc_blsp2_ahb_clk>;
 		clock-names = "core", "iface";
 	};
+
+	/* Nubia begin feature add uartblsp2dm2 */
+	uartblsp2dm2: serial@0c1b1000 {
+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+			reg = <0xc1b1000 0x1000>;
+			interrupts = <0 115 0>;
+			status = "disabled";
+			clocks = <&clock_gcc clk_gcc_blsp2_uart3_apps_clk>,
+					 <&clock_gcc clk_gcc_blsp2_ahb_clk>;
+			clock-names = "core", "iface";
+	};
+	/* Nubia end 2017.9.21 */
 
 	slim_aud: slim@171c0000 {
 		cell-index = <1>;
