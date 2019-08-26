@@ -1,0 +1,51 @@
+&i2c_5 {
+        status = "okay";
+		synaptics@20 {
+		status = "disabled";
+		};
+        synaptics_dsx@20 {
+		status = "okay";
+                compatible = "synaptics,dsx-i2c";
+                reg = <0x20>;
+                interrupt-parent = <&tlmm>;
+                interrupts = <125 0x2008>;
+                vdd_lcd-supply = <&pm8998_l14>;
+                vdd_ana-supply = <&pm8998_l28>;
+                vcc_i2c-supply = <&pm8998_l6>;
+                synaptics,tp-recovery-enable = <1>;
+                synaptics,lcd-reg-name = "vdd_lcd";
+                synaptics,pwr-reg-name = "vdd_ana";
+                synaptics,bus-reg-name = "vcc_i2c";
+                synaptics,irq-gpio = <&tlmm 125 0x2008>;
+                synaptics,irq-on-state = <0>;
+                synaptics,irq-flags = <0x2008>; /* IRQF_ONESHOT | IRQF_TRIGGER_LOW */
+                synaptics,power-delay-ms = <20>;
+                //synaptics,power-gpio = <&msm_gpio 69 0x0>;
+                //synaptics,power-on-state = <1>;
+                synaptics,reset-gpio = <&tlmm 89 0x0>;
+                synaptics,reset-on-state = <0>;
+                synaptics,reset-active-ms = <20>;
+                synaptics,reset-delay-ms = <20>;
+                synaptics,button_test_flag = <1>;
+                synaptics,factory_up_cap = <3000> ;
+                synaptics,factory_low_cap = <1500> ;
+                //synaptics,lcd-reset-gpio = <&tlmm 94 0x0>;
+                synaptics,cap-button-codes = <172 139 158>;
+                synaptics,ub-i2c-addr = <0x20>;
+                pinctrl-names = "synaptics_pin_active", "synaptics_pin_suspend";
+                pinctrl-0 = <&synaptics_int_active &synaptics_reset_active>;
+                pinctrl-1 = <&synaptics_int_suspend &synaptics_reset_suspend>;
+        };
+};
+&rpm_bus {
+	rpm-regulator-ldoa28 {
+		status = "okay";
+		pm8998_l28: regulator-l28 {
+			regulator-min-microvolt = <2856000>;
+			regulator-max-microvolt = <2856000>;
+			status = "okay";
+		};
+	};
+};
+
+

@@ -1,0 +1,87 @@
+/*
+  * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+*/
+&i2c_7 {
+	status = "okay";
+	ti@5a{
+		compatible = "ti,drv2605";
+		reg = <0x5a>;
+		pinctrl-names = "active","suspend";
+		pinctrl-0 = <&drv2605_power_active>;
+		pinctrl-1 = <&drv2605_power_suspend>;
+		ti,enable-gpio=<&tlmm 95 0x0>;
+	};
+	ams@39 {
+		compatible = "tmd2725";
+		reg = <0x39>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <62 0x2>;
+		vdd-supply = <&pm8998_l19>;
+		vio-supply = <&pm8998_lvs2>;
+		tmd,irq-gpio = <&tlmm 62 0x00>;
+		pinctrl-names = "tmd2725_default","tmd2725_sleep";
+		pinctrl-0 = <&tmd2725_default>;
+		pinctrl-1 = <&tmd2725_sleep>;
+		tmd,power_always_on = <1>;
+		tmd,has_als = <1>;
+		tmd,has_ps = <1>;
+		tmd,tp_moudle_count = <3>;
+		//[module_id] [which_seg] [d_factor] ch0[1] ch1[0] ch0[1] ch1[0]
+		tmd,tp0 = "0","0","652","1000","142","874","99";
+		//[module_id] [which_seg] [d_factor] ch0[1] ch1[0] ch0[1] ch1[0]
+		tmd,tp1 = "1","1","652","1000","142","874","99";
+		//[module_id] [which_seg] [d_factor] ch0[1] ch1[0] ch0[1] ch1[0]
+		tmd,tp2 = "2","0","652","1000","142","874","99";
+	};
+};		 
+&tlmm {
+	drv2605_power_pin{
+		pins = "gpio95";
+		qcom,num-grp-pins = <1>;
+		qcom,pin-func = <0>;
+		label = "drv2605_power_pin";
+		drv2605_power_active: active {
+			drive-strength = <6>;
+			bias-pull-up;
+			output-high;
+		};
+		drv2605_power_suspend: suspend {
+			drive-strength = <6>;
+			bias-pull-down;
+			output-low;
+		};
+	};
+	tmd2725_int_pin{
+		tmd2725_default: tmd2725_default{
+			mux {
+				pins = "gpio62";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio62";
+				drive-strength = <6>;
+				bias-pull-up;
+			};
+		};
+		tmd2725_sleep: tmd2725_sleep{
+			mux {
+	            pins = "gpio62";
+	            function = "gpio";
+	        };
+	        config {
+	            pins = "gpio62";
+	            drive-strength = <6>;
+	            bias-high-impedance;
+	        };
+		};
+	};
+};

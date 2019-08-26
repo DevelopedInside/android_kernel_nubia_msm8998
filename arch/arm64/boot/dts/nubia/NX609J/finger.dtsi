@@ -1,0 +1,18 @@
+/*
+ * nubia NX609J finger dts
+ */
+&soc {
+	goodix_fp{
+		status = "ok";
+		reg = <0>;
+		compatible = "goodix,fingerprint";
+		spi-max-frequency = <4800000>;
+		fp-gpio-reset = <&tlmm 85 0>;
+		fp-gpio-irq = <&tlmm 121 0>;
+		gf_vdd-supply = <&pm8998_l28>;
+		clock-names = "iface_clk", "core_clk";
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,<&clock_gcc clk_gcc_blsp2_qup6_spi_apps_clk>;
+	};
+};
+
+
