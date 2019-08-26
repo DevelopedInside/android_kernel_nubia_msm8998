@@ -390,6 +390,9 @@ done:
  *  FCC  *
 **********/
 #define EFFICIENCY_PCT	80
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+#define MIN_SPLIT_CHANGE_CURRENT_UA		300000
+#endif
 #define FCC_STEP_SIZE_UA 100000
 #define FCC_STEP_UPDATE_DELAY_MS 1000
 #define STEP_UP 1
@@ -438,10 +441,18 @@ static void get_fcc_split(struct pl_data *chip, int total_ua,
 	 * charger's current goes through main charger's BATFET, keep
 	 * the main charger's FCC to the votable result.
 	 */
+#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+	*slave_ua = min(*slave_ua, total_ua - MIN_SPLIT_CHANGE_CURRENT_UA);
+	if (chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN)
+		*master_ua = max(MIN_SPLIT_CHANGE_CURRENT_UA, total_ua);
+	else
+		*master_ua = max(MIN_SPLIT_CHANGE_CURRENT_UA, total_ua - *slave_ua);
+#else
 	if (chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN)
 		*master_ua = max(0, total_ua);
 	else
 		*master_ua = max(0, total_ua - *slave_ua);
+#endif
 
 	*slave_ua = (*slave_ua * chip->taper_pct) / 100;
 }
@@ -538,8 +549,15 @@ static int pl_fcc_vote_callback(struct votable *votable, void *data,
 	}
 
 	if (chip->pl_mode != POWER_SUPPLY_PL_NONE) {
+	#if defined(CONFIG_NUBIA_CHARGE_FEATURE)
+		if(total_fcc_ua >= MIN_SPLIT_CHANGE_CURRENT_UA) {
 		get_fcc_split(chip, total_fcc_ua,
 			&master_fcc_ua, &slave_fcc_ua);
+		}
+	#else
+		get_fcc_split(chip, total_fcc_ua,
+			&master_fcc_ua, &slave_fcc_ua);
+	#endif
 		if (chip->fcc_step_update) {
 			vote(chip->pl_awake_votable, FCC_STEPPER_VOTER,
 					true, 0);

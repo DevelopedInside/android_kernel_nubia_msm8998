@@ -100,4 +100,50 @@ config QPNP_QNOVO
 	  module. It also allows userspace code to read diagnostics of voltage
 	  and current measured during certain phases of the pulses.
 
+config TYPEC_AUDIO_ADAPTER_SWITCH
+	bool "Type C audio apapter switch"
+	depends on SPMI
+	help
+	  Say Y here to enable typec audio adpater switch controller.
+
+config NUBIA_CHARGE_FEATURE
+	bool "nubia charge feature support"
+	depends on SPMI
+	help
+	  Say Y here to enable nubia charge feature support.
+
+config NUBIA_HW_STEP_CHARGE_FEATURE
+	bool "Qualcomm hw step charge feature support"
+	depends on SPMI
+	help
+	  Say Y here to enable Qualcomm hw step charge feature support.
+
+config NEO_DIRECT_CHARGE_SUPPORT
+	bool "neo direct charge feature support"
+	depends on MFD_SPMI_PMIC
+	help
+	  Say Y here to enable neo direct charge feature support.
+
+config NEO_WP502X_CHARGER
+	bool "wp502x charger feature support"
+	depends on NEO_DIRECT_CHARGE_SUPPORT
+	help
+	  Say Y here to enable wp502x charger feature support.
+
+config DIRECT_QC_COMPATIBLE_FEATURE
+	bool "compatible for direct and quick charger feature support"
+	depends on MFD_SPMI_PMIC
+	help
+	  Say Y here to enable wp502x charger feature support.
+
+config NEO_BQ27520_BATTERY
+	tristate "BQ27520 battery driver"
+	depends on I2C
+	help
+	  Say Y here to enable support for batteries with BQ27520 (I2C/HDQ) chips.
+
+config NEO_EXTERNAL_FG_SUPPORT
+	tristate "external fuel gauge support driver"
+	help
+	  Say Y here to enable support for batteries with BQ27520 (I2C/HDQ) chips.
 endmenu
