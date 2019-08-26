@@ -36,7 +36,7 @@ config REGMAP_SWR
 config REGMAP_ALLOW_WRITE_DEBUGFS
 	depends on REGMAP && DEBUG_FS
 	bool "Allow REGMAP debugfs write"
-	default n
+	default y
 	help
 	  Say 'y' here to allow the regmap debugfs write. Regmap debugfs write
 	  could be risky when accessing some essential hardwares, so it is not
