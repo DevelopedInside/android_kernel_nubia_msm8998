@@ -29,7 +29,6 @@
 #ifdef CONFIG_MSM_PM
 #include "lpm-levels.h"
 #endif
-#include <linux/workqueue.h>
 
 /**
  * struct alarm_base - Alarm timer bases
@@ -51,16 +50,50 @@ static ktime_t freezer_delta;
 static DEFINE_SPINLOCK(freezer_delta_lock);
 
 static struct wakeup_source *ws;
-static struct delayed_work work;
-static struct workqueue_struct *power_off_alarm_workqueue;
+//static struct delayed_work work;
+//static struct workqueue_struct *power_off_alarm_workqueue;
 
 #ifdef CONFIG_RTC_CLASS
 /* rtc timer and device for setting alarm wakeups at suspend */
 static struct rtc_timer		rtctimer;
 static struct rtc_device	*rtcdev;
 static DEFINE_SPINLOCK(rtcdev_lock);
-static struct mutex power_on_alarm_lock;
-static struct alarm init_alarm;
+//static struct mutex power_on_alarm_lock;
+//static struct alarm init_alarm;
+#if 0
+//#ifdef CONFIG_NUBIA_POWEROFF_CHARGE_MODE_POWEROFF_ALARM
+#include <linux/reboot.h>
+
+static struct work_struct charger_mode_restart_work;
+static bool poweroff_charge_mode = false;
+
+static int get_poweroff_charge_mode(char *options)
+{
+	if(strncmp(options,"charger",strlen("charger"))==0){
+		printk(KERN_ERR"Charger mode!!!");
+		poweroff_charge_mode = true;
+	}
+
+	return 1;
+}
+__setup("androidboot.mode=",get_poweroff_charge_mode);
+
+static void charger_mode_restart_work_func(struct work_struct *work)
+{
+	kernel_restart("rtc");
+}
+
+static enum alarmtimer_restart init_alarm_handle(struct alarm *alarm,ktime_t now)
+{
+	if(poweroff_charge_mode){
+		printk(KERN_ERR"Will reboot for poweroff alarm!!!!");
+		INIT_WORK(&charger_mode_restart_work,charger_mode_restart_work_func);
+		schedule_work(&charger_mode_restart_work);
+	}
+
+	return ALARMTIMER_NORESTART;
+}
+#endif
 
 /**
  * power_on_alarm_init - Init power on alarm value
@@ -68,6 +101,7 @@ static struct alarm init_alarm;
  * Read rtc alarm value after device booting up and add this alarm
  * into alarm queue.
  */
+/* 
 void power_on_alarm_init(void)
 {
 	struct rtc_wkalrm rtc_alarm;
@@ -88,17 +122,23 @@ void power_on_alarm_init(void)
 
 	if (alarm_time) {
 		alarm_ktime = ktime_set(alarm_time, 0);
+	#ifdef CONFIG_NUBIA_POWEROFF_CHARGE_MODE_POWEROFF_ALARM
+		alarm_init(&init_alarm, ALARM_POWEROFF_REALTIME, init_alarm_handle);
+	#else
 		alarm_init(&init_alarm, ALARM_POWEROFF_REALTIME, NULL);
+	#endif
 		alarm_start(&init_alarm, alarm_ktime);
 	}
 }
-
+*/
 /**
  * set_power_on_alarm - set power on alarm value into rtc register
  *
  * Get the soonest power off alarm timer and set the alarm value into rtc
  * register.
  */
+ 
+#if 0
 void set_power_on_alarm(void)
 {
 	int rc;
@@ -162,6 +202,7 @@ exit:
 	mutex_unlock(&power_on_alarm_lock);
 }
 
+#endif
 static void alarmtimer_triggered_func(void *p)
 {
 	struct rtc_device *rtc = rtcdev;
@@ -232,8 +273,6 @@ static void alarmtimer_rtc_remove_device(struct device *dev,
 
 static inline void alarmtimer_rtc_timer_init(void)
 {
-	mutex_init(&power_on_alarm_lock);
-
 	rtc_timer_init(&rtctimer, NULL, NULL);
 }
 
@@ -260,13 +299,7 @@ struct rtc_device *alarmtimer_get_rtcdev(void)
 static inline int alarmtimer_rtc_interface_setup(void) { return 0; }
 static inline void alarmtimer_rtc_interface_remove(void) { }
 static inline void alarmtimer_rtc_timer_init(void) { }
-void set_power_on_alarm(void) { }
 #endif
-
-static void alarm_work_func(struct work_struct *unused)
-{
-	set_power_on_alarm();
-}
 
 /**
  * alarmtimer_enqueue - Adds an alarm timer to an alarm_base timerqueue
@@ -336,10 +369,6 @@ static enum hrtimer_restart alarmtimer_fired(struct hrtimer *timer)
 		ret = HRTIMER_RESTART;
 	}
 	spin_unlock_irqrestore(&base->lock, flags);
-
-	/* set next power off alarm */
-	if (alarm->type == ALARM_POWEROFF_REALTIME)
-		queue_delayed_work(power_off_alarm_workqueue, &work, 0);
 
 	return ret;
 
@@ -434,8 +463,6 @@ static int alarmtimer_suspend(struct device *dev)
 	int i;
 	int ret;
 
-	cancel_delayed_work_sync(&work);
-
 	spin_lock_irqsave(&freezer_delta_lock, flags);
 	min = freezer_delta;
 	freezer_delta = ktime_set(0, 0);
@@ -492,7 +519,6 @@ static int alarmtimer_resume(struct device *dev)
 		return 0;
 	rtc_timer_cancel(rtc, &rtctimer);
 
-	queue_delayed_work(power_off_alarm_workqueue, &work, 0);
 	return 0;
 }
 
@@ -673,14 +699,12 @@ EXPORT_SYMBOL_GPL(alarm_forward_now);
  * clock2alarm - helper that converts from clockid to alarmtypes
  * @clockid: clockid.
  */
-enum alarmtimer_type clock2alarm(clockid_t clockid)
+static enum alarmtimer_type clock2alarm(clockid_t clockid)
 {
 	if (clockid == CLOCK_REALTIME_ALARM)
 		return ALARM_REALTIME;
 	if (clockid == CLOCK_BOOTTIME_ALARM)
 		return ALARM_BOOTTIME;
-	if (clockid == CLOCK_POWEROFF_ALARM)
-		return ALARM_POWEROFF_REALTIME;
 	return -1;
 }
 
@@ -1077,13 +1101,10 @@ static int __init alarmtimer_init(void)
 
 	posix_timers_register_clock(CLOCK_REALTIME_ALARM, &alarm_clock);
 	posix_timers_register_clock(CLOCK_BOOTTIME_ALARM, &alarm_clock);
-	posix_timers_register_clock(CLOCK_POWEROFF_ALARM, &alarm_clock);
 
 	/* Initialize alarm bases */
 	alarm_bases[ALARM_REALTIME].base_clockid = CLOCK_REALTIME;
 	alarm_bases[ALARM_REALTIME].gettime = &ktime_get_real;
-	alarm_bases[ALARM_POWEROFF_REALTIME].base_clockid = CLOCK_REALTIME;
-	alarm_bases[ALARM_POWEROFF_REALTIME].gettime = &ktime_get_real;
 	alarm_bases[ALARM_BOOTTIME].base_clockid = CLOCK_BOOTTIME;
 	alarm_bases[ALARM_BOOTTIME].gettime = &ktime_get_boottime;
 	for (i = 0; i < ALARM_NUMTYPE; i++) {
@@ -1105,24 +1126,8 @@ static int __init alarmtimer_init(void)
 		goto out_drv;
 	}
 	ws = wakeup_source_register("alarmtimer");
-	if (!ws) {
-		error = -ENOMEM;
-		goto out_ws;
-	}
-
-	INIT_DELAYED_WORK(&work, alarm_work_func);
-	power_off_alarm_workqueue =
-		create_singlethread_workqueue("power_off_alarm");
-	if (!power_off_alarm_workqueue) {
-		error = -ENOMEM;
-		goto out_wq;
-	}
-
 	return 0;
-out_wq:
-	wakeup_source_unregister(ws);
-out_ws:
-	platform_device_unregister(pdev);
+
 out_drv:
 	platform_driver_unregister(&alarmtimer_driver);
 out_if:
