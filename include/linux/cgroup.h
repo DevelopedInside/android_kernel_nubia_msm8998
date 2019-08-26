@@ -54,6 +54,30 @@ extern struct css_set init_css_set;
 #include <linux/cgroup_subsys.h>
 #undef SUBSYS
 
+
+#ifdef CONFIG_NUBIA_CGF_NOTIFY_EVENT
+#define	NUBIA_FREEZER_SS_NAME	"freezer"
+#define	NUBIA_FREEZER_KN_NAME	""
+#define	NUBIA_FREEZER_BG_KN_NAME	"bg"
+struct cgf_event {
+	struct signal_struct *info;
+	void *data;
+};
+struct freezer {
+	struct cgroup_subsys_state	css;
+	struct notifier_block 	nf;
+	struct cgf_event	event;
+	struct workqueue_struct *cgf_notify_wq;
+	struct work_struct	cgf_notify_work;
+	unsigned int		state;
+	spinlock_t		lock;
+};
+extern int cgf_register_notifier(struct notifier_block *nb);
+extern int cgf_unregister_notifier(struct notifier_block *nb);
+extern int cgf_notifier_call_chain(unsigned long val, void *v);
+extern int cgf_attach_task_group(struct cgf_event *event);
+#endif
+
 #define SUBSYS(_x)								\
 	extern struct static_key_true _x ## _cgrp_subsys_enabled_key;		\
 	extern struct static_key_true _x ## _cgrp_subsys_on_dfl_key;
