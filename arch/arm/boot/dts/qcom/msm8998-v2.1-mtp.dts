@@ -10,7 +10,6 @@
  * GNU General Public License for more details.
  */
 
-
 /dts-v1/;
 
 #include "msm8998-v2.1.dtsi"
@@ -22,7 +21,4 @@
 	compatible = "qcom,msm8998-mtp", "qcom,msm8998", "qcom,mtp";
 	qcom,board-id = <8 0>;
 };
-&snd_934x {
-	qcom,msm-mbhc-moist-cfg = <0>, <0>, <3>;
-	qcom,msm-mbhc-usbc-audio-supported = <1>;
-};
+#include NUBIA_OVERWRITE_DTSI_FILE

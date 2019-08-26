@@ -11,7 +11,8 @@
  */
 
 #include <dt-bindings/interrupt-controller/irq.h>
-#include "msm8998-camera-sensor-mtp.dtsi"
+#include "msm8998-pinctrl.dtsi"
+//#include "msm8998-camera-sensor-mtp.dtsi"
 &vendor {
 	bluetooth: bt_wcn3990 {
 		compatible = "qca,wcn3990";
@@ -180,6 +181,31 @@
 	};
 };
 
+//ZTEMT: fengxun added for AL3200 ---start
+&spi_2 {
+	status = "ok";
+	mini_isp@0 {
+		compatible = "altek,mini_isp";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <7 0x00>;
+		pinctrl-names = "pmx_ts_active","pmx_ts_suspend";
+		pinctrl-0 = <&al3200_gpio_int_active &al3200_gpio_active>;
+		pinctrl-1 = <&al3200_gpio_int_sleep &al3200_gpio_sleep>;
+		reset-gpios = <&tlmm 6 0x00>;
+		irq-gpios = <&tlmm 7 0x00>;
+		vcc1-gpios = <&tlmm 77 0x00>;
+		vcc2-gpios = <&tlmm 115 0x00>;
+		vcc3-gpios = <&tlmm 21 0x00>;
+		clocks = <&clock_gcc clk_div_clk2>;
+		clock-names = "al3200_clk";
+		qcom,clock-rates = <19200000>;
+		status = "ok";
+	};
+};
+//ZTEMT: fengxun added for AL3200 ---end
+
 &pmi8998_gpios {
 	/* GPIO 6 for the internal QNOVO discharge FET control signal */
 	gpio@c500 {
@@ -238,8 +264,14 @@
 		clocks = <&clock_gcc clk_ln_bb_clk3_pin>;
 		clock-names = "ref_clk";
 	};
+	  tas2555@4C {
+               compatible = "ti,tas2555";
+               reg = <0x4C>;
+               ti,cdc-reset-gpio = <&tlmm 25 0x00>;
+     };
 };
 
+/****
 &mdss_hdmi_tx {
 	pinctrl-names = "hdmi_hpd_active", "hdmi_ddc_active", "hdmi_cec_active",
 				"hdmi_active", "hdmi_sleep";
@@ -263,25 +295,21 @@
 	qcom,aux-sel-gpio = <&tlmm 78 0>;
 	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
 };
-
+*****/
 &mdss_mdp {
 	qcom,mdss-pref-prim-intf = "dsi";
 };
 
 &mdss_dsi {
-	hw-config = "split_dsi";
+	hw-config = "single_dsi";
 };
 
 &mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi_dual_nt35597_video>;
-	pinctrl-names = "mdss_default", "mdss_sleep";
-	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
-	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+	qcom,dsi-pref-prim-pan = <&dsi_jdi_td4310_1080_2160_5p99_video>;
 	qcom,platform-reset-gpio = <&tlmm 94 0>;
-	qcom,platform-te-gpio = <&tlmm 10 0>;
-	qcom,panel-mode-gpio = <&tlmm 91 0>;
+	//qcom,platform-te-gpio = <&tlmm 10 0>;
 };
-
+/***
 &mdss_dsi1 {
 	qcom,dsi-pref-prim-pan = <&dsi_dual_nt35597_video>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
@@ -291,7 +319,7 @@
 	qcom,platform-te-gpio = <&tlmm 10 0>;
 	qcom,panel-mode-gpio = <&tlmm 91 0>;
 };
-
+**/
 &labibb {
 	status = "ok";
 	qcom,qpnp-labibb-mode = "lcd";
@@ -300,6 +328,11 @@
 &pmi8998_wled {
 	qcom,led-strings-list = [00 01];
 };
+
+/*&dsi_jdi_td4310_1080_2160_5p99_video {
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};*/
 
 &red_led {
 	/delete-property/ linux,default-trigger;
@@ -445,17 +478,17 @@
 };
 
 &dsi_dual_sharp_wqhd_video {
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+       qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+       qcom,mdss-dsi-bl-min-level = <1>;
+       qcom,mdss-dsi-bl-max-level = <4095>;
+       qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
 };
 
 &dsi_dual_sharp_wqhd_cmd {
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,mdss-dsi-bl-min-level = <1>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+       qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+       qcom,mdss-dsi-bl-min-level = <1>;
+       qcom,mdss-dsi-bl-max-level = <4095>;
+       qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
 };
 
 &mem_client_3_size {
@@ -573,7 +606,7 @@
 };
 
 &snd_9335 {
-	qcom,mbhc-audio-jack-type = "6-pole-jack";
+	qcom,mbhc-audio-jack-type = "4-pole-jack";
 };
 
 &soc {

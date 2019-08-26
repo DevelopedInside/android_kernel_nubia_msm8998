@@ -61,7 +61,9 @@
 			"MIC BIAS2", "ANCRight Headset Mic",
 			"AMIC4", "MIC BIAS2",
 			"MIC BIAS2", "ANCLeft Headset Mic",
-			"AMIC5", "MIC BIAS3",
+			"AMIC5", "MIC BIAS1",
+			"MIC BIAS1", "Secondary Mic",
+			"AMIC6", "MIC BIAS3",
 			"MIC BIAS3", "Handset Mic",
 			"AMIC6", "MIC BIAS4",
 			"MIC BIAS4", "Analog Mic6",
@@ -80,11 +82,13 @@
 			"SpkrLeft IN", "SPK1 OUT",
 			"SpkrRight IN", "SPK2 OUT";
 
-		qcom,msm-mbhc-hphl-swh = <0>;
+		qcom,msm-mbhc-hphl-swh = <1>;
 		qcom,msm-mbhc-gnd-swh = <0>;
 		qcom,us-euro-gpios = <&wcd_us_euro_gpio>;
-		qcom,hph-en0-gpio = <&hph_en0_gpio>;
-		qcom,hph-en1-gpio = <&hph_en1_gpio>;
+		//qcom,swap-en0-gpios = <&tlmm 75 0>;
+		//qcom,swap-en1-gpios = <&tlmm 80 0>;
+		//qcom,hph-en0-gpio = <&hph_en0_gpio>;
+		//qcom,hph-en1-gpio = <&hph_en1_gpio>;
 		qcom,tasha-mclk-clk-freq = <9600000>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
@@ -141,13 +145,14 @@
 		asoc-codec = <&stub_codec>, <&ext_disp_audio_codec>;
 		asoc-codec-names = "msm-stub-codec.1",
 				   "msm-ext-disp-audio-codec-rx";
-		qcom,wsa-max-devs = <2>;
+		qcom,wsa-max-devs = <0>;
 		qcom,wsa-devs = <&wsa881x_211>, <&wsa881x_212>,
 				<&wsa881x_213>, <&wsa881x_214>;
 		qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight",
 					  "SpkrLeft", "SpkrRight";
 
 		hph_en0_gpio: msm_cdc_pinctrl@67 {
+			status = "disabled";
 			compatible = "qcom,msm-cdc-pinctrl";
 			pinctrl-names = "aud_active", "aud_sleep";
 			pinctrl-0 = <&hph_en0_active>;
@@ -155,6 +160,7 @@
 		};
 
 		hph_en1_gpio: msm_cdc_pinctrl@68 {
+			status = "disabled";
 			compatible = "qcom,msm-cdc-pinctrl";
 			pinctrl-names = "aud_active", "aud_sleep";
 			pinctrl-0 = <&hph_en1_active>;
@@ -162,7 +168,7 @@
 		};
 	};
 
-	snd_934x: sound-tavil {
+	/*snd_934x: sound-tavil {
 		compatible = "qcom,msm8998-asoc-snd-tavil";
 		qcom,model = "msm8998-tavil-snd-card";
 		qcom,ext-disp-audio-rx;
@@ -216,8 +222,9 @@
 		qcom,hph-en1-gpio = <&tavil_hph_en1>;
 		qcom,tavil-mclk-clk-freq = <9600000>;
 
-		qcom,usbc-analog-en1_gpio = <&wcd_usbc_analog_en1_gpio>;
-		qcom,usbc-analog-en2_n_gpio = <&wcd_usbc_analog_en2n_gpio>;
+		//nubia delete
+		//qcom,usbc-analog-en1_gpio = <&wcd_usbc_analog_en1_gpio>;
+		//qcom,usbc-analog-en2_n_gpio = <&wcd_usbc_analog_en2n_gpio>;
 
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
@@ -279,7 +286,7 @@
 				<&wsa881x_0213>, <&wsa881x_0214>;
 		qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight",
 					  "SpkrLeft", "SpkrRight";
-	};
+	};*/
 
 	cpe: qcom,msm-cpe-lsm {
 		compatible = "qcom,msm-cpe-lsm";
@@ -305,7 +312,7 @@
 		pinctrl-0 = <&wcd_gnd_mic_swap_active>;
 		pinctrl-1 = <&wcd_gnd_mic_swap_idle>;
 	};
-
+/*
 	wcd_usbc_analog_en1_gpio: msm_cdc_pinctrl@59 {
 		compatible = "qcom,msm-cdc-pinctrl";
 		pinctrl-names = "aud_active", "aud_sleep";
@@ -319,7 +326,7 @@
 		pinctrl-0 = <&wcd_usbc_analog_en2n_active>;
 		pinctrl-1 = <&wcd_usbc_analog_en2n_idle>;
 	};
-
+*/
 	wcd9xxx_intc: wcd9xxx-irq {
 		status = "ok";
 		compatible = "qcom,wcd9xxx-irq";
@@ -353,9 +360,9 @@
 		#clock-cells = <1>;
 	};
 
-	wcd_rst_gpio: msm_cdc_pinctrl@64 {
+	wcd_rst_gpio: msm_cdc_pinctrl@63 {
 		compatible = "qcom,msm-cdc-pinctrl";
-		qcom,cdc-rst-n-gpio = <&tlmm 64 0>;
+		qcom,cdc-rst-n-gpio = <&tlmm 63 0>;
 		pinctrl-names = "aud_active", "aud_sleep";
 		pinctrl-0 = <&cdc_reset_active>;
 		pinctrl-1 = <&cdc_reset_sleep>;
@@ -413,10 +420,10 @@
 					   "cdc-vdd-rx-h",
 					   "cdc-vddpx-1";
 
-		qcom,cdc-micbias1-mv = <1800>;
-		qcom,cdc-micbias2-mv = <1800>;
-		qcom,cdc-micbias3-mv = <1800>;
-		qcom,cdc-micbias4-mv = <1800>;
+		qcom,cdc-micbias1-mv = <2500>;
+		qcom,cdc-micbias2-mv = <2700>;
+		qcom,cdc-micbias3-mv = <2500>;
+		qcom,cdc-micbias4-mv = <2500>;
 
 		qcom,cdc-mclk-clk-rate = <9600000>;
 		qcom,cdc-slim-ifd = "tasha-slim-ifd";
@@ -424,6 +431,7 @@
 		qcom,cdc-dmic-sample-rate = <4800000>;
 		qcom,cdc-mad-dmic-rate = <600000>;
 		qcom,cdc-ecpp-dmic-rate = <1200000>;
+		qcom,cdc-dmic-clk-drv-strength = <2>;
 	};
 
 	wcd934x_cdc: tavil_codec {
