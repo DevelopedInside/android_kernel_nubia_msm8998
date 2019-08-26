@@ -22,3 +22,5 @@
 	compatible = "qcom,msm8998-mtp", "qcom,msm8998", "qcom,mtp";
 	qcom,board-id = <8 0>;
 };
+#include NUBIA_OVERWRITE_DTSI_FILE
+

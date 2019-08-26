@@ -13,6 +13,7 @@
 &slim_aud {
 	tasha_codec {
 		wsa_spkr_sd1: msm_cdc_pinctrll {
+		      status = "disabled";
 		      compatible = "qcom,msm-cdc-pinctrl";
 		      pinctrl-names = "aud_active", "aud_sleep";
 		      pinctrl-0 = <&spkr_1_sd_n_active>;
@@ -20,6 +21,7 @@
 		};
 
 		wsa_spkr_sd2: msm_cdc_pinctrlr {
+		      status = "disabled";
 		      compatible = "qcom,msm-cdc-pinctrl";
 		      pinctrl-names = "aud_active", "aud_sleep";
 		      pinctrl-0 = <&spkr_2_sd_n_active>;

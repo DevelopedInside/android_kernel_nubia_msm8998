@@ -37,3 +37,5 @@
 				0xff 0x218
 				0x62 0x210>;
 };
+#include NUBIA_OVERWRITE_DTSI_FILE
+
