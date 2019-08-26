@@ -1,0 +1,14 @@
+
+menu "nubia driver touchscreens"
+
+config NUBIA_SYNAPTICS_DSX
+        bool "config nubia synaptics dsx"
+        default n
+        help
+          Say Y here if you have a nubia touchscreen hxchipset connected
+          to your system.
+	  If unsure, say N.
+
+source "drivers/nubia/touch/nubia_synaptics_dsx/Kconfig"
+
+endmenu
