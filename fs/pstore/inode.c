@@ -127,8 +127,12 @@ static int pstore_check_syslog_permissions(struct pstore_private *ps)
 	switch (ps->type) {
 	case PSTORE_TYPE_DMESG:
 	case PSTORE_TYPE_CONSOLE:
+#ifdef CONFIG_NUBIA_READ_CONSOLE
+		return 0;
+#else
 		return check_syslog_permissions(SYSLOG_ACTION_READ_ALL,
 			SYSLOG_FROM_READER);
+#endif
 	default:
 		return 0;
 	}

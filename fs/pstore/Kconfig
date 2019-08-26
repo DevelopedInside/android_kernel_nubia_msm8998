@@ -60,3 +60,9 @@ config PSTORE_RAM
 	  "ramoops.ko".
 
 	  For more information, see Documentation/ramoops.txt.
+
+config NUBIA_READ_CONSOLE
+	bool "nubia read pstore log"
+	default n
+	help
+		nubia read pstore log

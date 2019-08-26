@@ -90,8 +90,14 @@ static ssize_t fuse_passthrough_read_write_iter(struct kiocb *iocb,
 		ret_val = passthrough_filp->f_op->write_iter(iocb, iter);
 
 		if (ret_val >= 0 || ret_val == -EIOCBQUEUED) {
+            // nubia add
+            struct fuse_inode *fi = get_fuse_inode(fuse_inode);
+            // nubia add end
 			spin_lock(&fc->lock);
 			fsstack_copy_inode_size(fuse_inode, passthrough_inode);
+            // nubia add
+            fi->attr_version = ++fc->attr_version;
+            // nubia add end
 			spin_unlock(&fc->lock);
 			fsstack_copy_attr_times(fuse_inode, passthrough_inode);
 		}

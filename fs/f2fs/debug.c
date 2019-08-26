@@ -478,7 +478,11 @@ int f2fs_build_stats(struct f2fs_sb_info *sbi)
 	mutex_lock(&f2fs_stat_mutex);
 	list_add_tail(&si->stat_list, &f2fs_stat_list);
 	mutex_unlock(&f2fs_stat_mutex);
-
+//nubia add start
+#ifdef CONFIG_NUBIA_F2FS_TRIM_STAT
+    sbi->trim_stat = NUBAI_F2FS_NO_TRIMED;
+#endif
+//nubia add end
 	return 0;
 }
 
