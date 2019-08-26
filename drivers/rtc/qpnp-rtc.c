@@ -272,7 +272,7 @@ qpnp_rtc_read_time(struct device *dev, struct rtc_time *tm)
 		return rc;
 	}
 
-	dev_dbg(dev, "secs = %lu, h:m:s == %d:%d:%d, d/m/y = %d/%d/%d\n",
+	pr_err("qpnp_rtc_read_time secs = %lu, h:m:s == %d:%d:%d, d/m/y = %d/%d/%d\n",
 			secs, tm->tm_hour, tm->tm_min, tm->tm_sec,
 			tm->tm_mday, tm->tm_mon, tm->tm_year);
 
@@ -334,7 +334,7 @@ qpnp_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 
 	rtc_dd->alarm_ctrl_reg1 = ctrl_reg;
 
-	dev_dbg(dev, "Alarm Set for h:r:s=%d:%d:%d, d/m/y=%d/%d/%d\n",
+	pr_err(" qpnp_rtc_set_alarm Alarm Set for h:r:s=%d:%d:%d, d/m/y=%d/%d/%d\n",
 			alarm->time.tm_hour, alarm->time.tm_min,
 			alarm->time.tm_sec, alarm->time.tm_mday,
 			alarm->time.tm_mon, alarm->time.tm_year);
@@ -368,7 +368,7 @@ qpnp_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 		return rc;
 	}
 
-	dev_dbg(dev, "Alarm set for - h:r:s=%d:%d:%d, d/m/y=%d/%d/%d\n",
+	pr_err("qpnp_rtc_read_alarm Alarm set for - h:r:s=%d:%d:%d, d/m/y=%d/%d/%d\n",
 		alarm->time.tm_hour, alarm->time.tm_min,
 				alarm->time.tm_sec, alarm->time.tm_mday,
 				alarm->time.tm_mon, alarm->time.tm_year);
@@ -630,7 +630,58 @@ fail_rtc_enable:
 
 	return rc;
 }
+//Begin [0016004715 add the kernel power code,20180316]
+#ifdef CONFIG_ZTEMT_POWER_DEBUG
+static time_t rtc_suspend_sec = 0;
+static time_t rtc_resume_sec = 0;
+static unsigned long all_sleep_time = 0;
+static unsigned long all_wake_time = 0;
 
+static int print_suspend_time(struct device *dev)
+{
+	int rc, diff=0;
+	struct rtc_time tm;
+	unsigned long now;
+
+	rc = qpnp_rtc_read_time(dev,&tm);
+    if(rc) {
+	  printk("%s: Unable to read from RTC\n", __func__);
+	}
+
+	rtc_tm_to_time(&tm, &now);
+	rtc_suspend_sec = now;
+	diff = rtc_suspend_sec - rtc_resume_sec;
+	all_wake_time += diff;
+	printk("I have work %d seconds all_wake_time %lu seconds\n",diff,all_wake_time);
+
+	return 0;
+}
+
+static int print_resume_time(struct device *dev)
+{
+	int rc, diff=0;
+	struct rtc_time tm;
+	unsigned long now;
+
+	rc = qpnp_rtc_read_time(dev,&tm);
+    if (rc) {
+	  printk("%s: Unable to read from RTC\n", __func__);
+	}
+
+	rtc_tm_to_time(&tm, &now);
+	rtc_resume_sec = now;
+	diff = rtc_resume_sec - rtc_suspend_sec;
+	all_sleep_time += diff;
+	printk("I have sleep %d seconds all_sleep_time %lu seconds\n",diff,all_sleep_time);
+
+	return 0;
+}
+static const struct dev_pm_ops qpnp_rtc_pm_ops = {
+	.suspend = print_suspend_time,
+	.resume = print_resume_time,
+};
+#endif
+//End [0016004715 add the kernel power code,20180316]
 static int qpnp_rtc_remove(struct platform_device *pdev)
 {
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(&pdev->dev);
@@ -703,6 +754,11 @@ static struct platform_driver qpnp_rtc_driver = {
 		.name		= "qcom,qpnp-rtc",
 		.owner		= THIS_MODULE,
 		.of_match_table	= spmi_match_table,
+//Begin [0016004715 add the kernel power code,20180316]
+	#ifdef CONFIG_ZTEMT_POWER_DEBUG
+               .pm	= &qpnp_rtc_pm_ops,
+        #endif //CONFIG_ZTEMT_POWER_DEBUG
+//End [0016004715 add the kernel power code,20180316]
 	},
 };
 
