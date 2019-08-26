@@ -27,6 +27,8 @@
 #include "dsi_ctrl_hw.h"
 #include "dsi_clk_pwr.h"
 
+#include "mdss_panel.h"
+
 #define MAX_BL_LEVEL 4096
 
 enum dsi_panel_rotation {
