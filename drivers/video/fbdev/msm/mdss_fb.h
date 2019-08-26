@@ -31,6 +31,7 @@
 #define MFD_KEY  0x11161126
 #define MSM_FB_MAX_DEV_LIST 32
 
+
 #define MSM_FB_ENABLE_DBGFS
 #define WAIT_FENCE_FIRST_TIMEOUT (3 * MSEC_PER_SEC)
 #define WAIT_FENCE_FINAL_TIMEOUT (7 * MSEC_PER_SEC)
@@ -240,6 +241,10 @@ struct msm_mdp_interface {
 };
 
 #define IS_CALIB_MODE_BL(mfd) (((mfd)->calib_mode) & MDSS_CALIB_MODE_BL)
+#ifdef CONFIG_NUBIA_LCD_BACKLIGHT_CURVE
+int nubia_backlight_covert(struct msm_fb_data_type *mfd,
+				      int value);
+#endif
 #define MDSS_BRIGHT_TO_BL(out, v, bl_max, max_bright) do {\
 				out = (2 * (v) * (bl_max) + max_bright);\
 				do_div(out, 2 * max_bright);\
