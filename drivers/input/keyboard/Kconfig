@@ -11,7 +11,11 @@ menuconfig INPUT_KEYBOARD
 	  If unsure, say Y.
 
 if INPUT_KEYBOARD
-
+config NUBIA_KEYBOARD_GAMESWITCH
+        tristate "Keypad NUBIA GameSwitchkey"
+        depends on KEYBOARD_GPIO
+        help
+          Addr GameSwitchkey attr
 config KEYBOARD_ADP5520
 	tristate "Keypad Support for ADP5520 PMIC"
 	depends on PMIC_ADP5520
