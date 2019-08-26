@@ -660,7 +660,7 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
 #else
 		registers_mode = 0400;
 #endif
-
+        registers_mode = 0666; //added by nubia, for qact read regmap
 		debugfs_create_file("registers", registers_mode, map->debugfs,
 				    map, &regmap_map_fops);
 
