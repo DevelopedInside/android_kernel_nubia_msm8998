@@ -273,7 +273,39 @@ out:
 	kfree(bits);
 	return error;
 }
+#ifdef CONFIG_NUBIA_KEYBOARD_GAMESWITCH
+static ssize_t gpio_keys_store_GamekeyStatus(struct device *dev,		\
+				      struct device_attribute *attr,	\
+				      const char *buf,			\
+				      size_t count)
+{
 
+	return count;
+}
+static ssize_t gpio_keys_show_GamekeyStatus(struct device *dev,		\
+				     struct device_attribute *attr,	\
+				     char *buf)
+{
+    struct platform_device *pdev = to_platform_device(dev);
+    struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);
+    int state;
+    /* Report current state of buttons that are connected to GPIOs */
+    int i;
+    for (i = 0; i < ddata->pdata->nbuttons; i++) {
+        struct gpio_button_data *bdata = &ddata->data[i];
+        if (bdata->button->code == KEY_GAME_SWITCH)
+        {
+            state = (__gpio_get_value(bdata->button->gpio) ? 1 : 0) ^ bdata->button->active_low;
+        }
+    }
+    return snprintf(buf, sizeof(state), "%d\n",
+                    state);
+}
+
+static DEVICE_ATTR(GamekeyStatus, S_IWUSR | S_IRUGO,
+		   gpio_keys_show_GamekeyStatus,
+		   gpio_keys_store_GamekeyStatus);
+#endif
 #define ATTR_SHOW_FN(name, type, only_disabled)				\
 static ssize_t gpio_keys_show_##name(struct device *dev,		\
 				     struct device_attribute *attr,	\
@@ -338,6 +370,9 @@ static struct attribute *gpio_keys_attrs[] = {
 	&dev_attr_switches.attr,
 	&dev_attr_disabled_keys.attr,
 	&dev_attr_disabled_switches.attr,
+#ifdef CONFIG_NUBIA_KEYBOARD_GAMESWITCH
+	&dev_attr_GamekeyStatus.attr,
+#endif
 	NULL,
 };
 
