@@ -1,0 +1,29 @@
+#
+# Nubia drivers configuration
+#
+
+#menuconfig NUBIA_DRIVERS
+menu "nubia drivers"
+
+config NUBIA_DRIVERS
+	bool "NUBIA DRIVERS"
+	default n
+	help
+	  Say Y here if you want to enable NUBIA DRIVERS
+	  If unsure, say N.
+
+comment "Nubia Device Drivers"
+
+# Add nubia drivers configuration here
+
+config NUBIA_TOUCHSCREENS
+	bool "NUBIA_TOUCHSCREENS"
+	depends on NUBIA_DRIVERS
+	default n
+	help
+	  Say Y here if you want to enable NUBIA_TOUCHSCREENS
+	  If unsure, say N.
+
+source "drivers/nubia/touch/Kconfig"
+
+endmenu
