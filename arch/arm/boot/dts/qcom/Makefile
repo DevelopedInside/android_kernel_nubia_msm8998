@@ -326,10 +326,25 @@ dtb-$(CONFIG_ARCH_SDM630) += sdm630-rumi.dtb \
 	sdm455-internal-codec-rcm.dtb
 
 ifeq ($(CONFIG_ARM64),y)
-#always          := $(dtb-y)
-always          := $(NUBIA_DTS_NAME)
+ifeq ($(CONFIG_MACH_NUBIA_NX563J),y)
+always          += msm8998-mtp-NX563J.dtb \
+        msm8998-v2-mtp-NX563J.dtb \
+        msm8998-v2.1-mtp-NX563J.dtb
+subdir-y        := $(dts-dirs)
+else ifeq ($(CONFIG_MACH_NUBIA_NX595J),y)
+always          += msm8998-mtp-NX595J.dtb \
+        msm8998-v2-mtp-NX595J.dtb \
+        msm8998-v2.1-mtp-NX595J.dtb
+subdir-y        := $(dts-dirs)
+else ifeq ($(CONFIG_MACH_NUBIA_NX609J),y)
+always          += msm8998-mtp-NX609J.dtb \
+        msm8998-v2-mtp-NX609J.dtb \
+        msm8998-v2.1-mtp-NX609J.dtb
+subdir-y        := $(dts-dirs)
+else
 always          += $(dtbo-y)
 subdir-y        := $(dts-dirs)
+endif
 else
 targets += dtbs
 targets += $(addprefix ../, $(dtb-y))
