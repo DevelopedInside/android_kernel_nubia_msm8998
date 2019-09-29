@@ -32,7 +32,7 @@
 #include "dsi-panel-nt36850-truly-dualmipi-wqhd-cmd.dtsi"
 #include "dsi-panel-sharp-dualdsi-wqhd-video.dtsi"
 #include "dsi-panel-sharp-dualdsi-wqhd-cmd.dtsi"
-#include "../nubia/NX609J/nubia-jdi-td4310-1080-2160-5p99-video.dtsi"
+#include "nubia/NX609J/nubia-jdi-td4310-1080-2160-5p99-video.dtsi"
 &soc {
 	dsi_panel_pwr_supply: dsi_panel_pwr_supply {
 		#address-cells = <1>;
