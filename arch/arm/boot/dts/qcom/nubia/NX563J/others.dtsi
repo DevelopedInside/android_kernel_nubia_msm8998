@@ -88,6 +88,7 @@
 	qcom,led-strings-list = [00 01];
 };
 
+/*
 &firmware{
 	android{
 		fstab{
@@ -95,3 +96,4 @@
 		};
 	};
 };
+*/
