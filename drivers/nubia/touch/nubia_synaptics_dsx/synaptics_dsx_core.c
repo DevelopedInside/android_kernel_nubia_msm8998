@@ -78,8 +78,8 @@
 #define REPORT_2D_Z
 #define REPORT_2D_W
 
-#define MINXTOUCH 30
-#define MAXXTOUCH 1040
+#define MINXTOUCH 42
+#define MAXXTOUCH 1038
 #define LIMITTOUCH 1
 
 //#define REPORT_2D_PRESSURE
