@@ -1426,6 +1426,24 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			if (rmi4_data->hw_if->board_data->y_flip)
 				y = rmi4_data->sensor_max_y - y;
 
+#ifdef LIMITTOUCH
+			if ((x >= 0) && ((x < MINXTOUCH) || (x > MAXXTOUCH))) {
+#ifdef TYPE_B_PROTOCOL
+				/*
+				* Each 2-bit finger status field represents the following:
+				* 00 = finger not present
+				* 01 = finger present and data accurate
+				* 10 = finger present but data may be inaccurate
+				* 11 = reserved
+				*/
+				input_mt_slot(rmi4_data->input_dev, finger);
+				input_mt_report_slot_state(rmi4_data->input_dev,
+						MT_TOOL_FINGER, 0);
+#endif
+				continue;
+            }
+#endif
+
 			input_report_key(rmi4_data->input_dev,
 					BTN_TOUCH, 1);
 			input_report_key(rmi4_data->input_dev,
@@ -1667,9 +1685,23 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #endif
 
 #ifdef LIMITTOUCH
-			if ((x > 0) && ((x < MINXTOUCH) || (x > MAXXTOUCH)))
-				break;
+			if ((x >= 0) && ((x < MINXTOUCH) || (x > MAXXTOUCH))) {
+#ifdef TYPE_B_PROTOCOL
+				/*
+				* Each 2-bit finger status field represents the following:
+				* 00 = finger not present
+				* 01 = finger present and data accurate
+				* 10 = finger present but data may be inaccurate
+				* 11 = reserved
+				*/
+				input_mt_slot(rmi4_data->input_dev, finger);
+				input_mt_report_slot_state(rmi4_data->input_dev,
+						MT_TOOL_FINGER, 0);
 #endif
+				continue;
+            }
+#endif
+
 			input_report_key(rmi4_data->input_dev,
 					BTN_TOUCH, 1);
 			input_report_key(rmi4_data->input_dev,
