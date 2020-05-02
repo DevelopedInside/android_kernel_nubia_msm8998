@@ -3296,6 +3296,14 @@ int wma_stats_event_handler(void *handle, uint8_t *cmd_param_info,
 			buf_len += event->num_peer_stats * sizeof(*peer_stats);
 		}
 
+		if (buf_len > param_buf->num_data) {
+			WMA_LOGE("%s: num_data: %d Invalid num_pdev_stats:%d or num_vdev_stats:%d or num_peer_stats:%d",
+				__func__, param_buf->num_data,
+				event->num_pdev_stats,
+				event->num_vdev_stats, event->num_peer_stats);
+			return -EINVAL;
+		}
+
 		rssi_event =
 			(wmi_per_chain_rssi_stats *) param_buf->chain_stats;
 		if (rssi_event) {
@@ -3316,7 +3324,6 @@ int wma_stats_event_handler(void *handle, uint8_t *cmd_param_info,
 		WMA_LOGE("excess wmi buffer: stats pdev %d vdev %d peer %d",
 			 event->num_pdev_stats, event->num_vdev_stats,
 			 event->num_peer_stats);
-		QDF_ASSERT(0);
 		return -EINVAL;
 	}
 
@@ -6020,6 +6027,7 @@ void wma_peer_debug_log(uint8_t vdev_id, uint8_t op,
  *
  * Return: printable string for the operation
  */
+#ifdef WLAN_DEBUG
 static char *wma_peer_debug_string(uint32_t op)
 {
 	switch (op) {
@@ -6059,6 +6067,7 @@ static char *wma_peer_debug_string(uint32_t op)
 		return "unknown";
 	}
 }
+#endif
 
 /**
  * wma_peer_debug_dump() - Print the peer debug log records
