@@ -80,7 +80,9 @@
 
 #define MINXTOUCH 42
 #define MAXXTOUCH 1038
+#if defined(CONFIG_MACH_NUBIA_NX563J) || defined(CONFIG_MACH_NUBIA_NX595J)
 #define LIMITTOUCH 1
+#endif
 
 //#define REPORT_2D_PRESSURE
 
