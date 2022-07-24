@@ -240,7 +240,7 @@ enum isp_cmd_sensor_type {
  *@struct RECORDER_SENSORINFO
  *@brief Sensor info definition
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_sensor_info {
 	bool on; /* On/off flag*/
 	u8 sensor_mode; /* Sensor mode*/
@@ -250,7 +250,7 @@ struct isp_cmd_sensor_info {
  *@struct RECORDER_TXINFO
  *@brief MIPI Transmit info
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_tx_info {
 	bool on; /* On/off flag*/
 };
@@ -280,7 +280,7 @@ enum mini_isp_mode {
  *@struct isp_cmd_system_info
  *@brief ISP master cmd for system info definition
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_system_info {
 	u8 fw_version_info[FWVER_INFOSIZE_MAX]; /*Firmware version info*/
 	u16 isp_chip_id; /* ISP Chip ID*/
@@ -295,7 +295,7 @@ struct isp_cmd_system_info {
  *@struct isp_cmd_depth_3a_info
  *@brief depth 3A information
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_depth_3a_info {
 	u32 main_cam_exp_time;
 	u16 main_cam_exp_gain;
@@ -321,7 +321,7 @@ struct isp_cmd_depth_3a_info {
  *@struct isp_cmd_basic_para
  *@brief ISP master cmd for basic parameters access
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_basic_para {
 	u8  anti_flicker_mode;
 	u8  auto_exposure[SENSOR_TYPEMAX];
@@ -359,7 +359,7 @@ struct isp_cmd_basic_para {
  *@struct isp_cmd_ae_zone_info
  *@brief ISP Command information for AE control
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_ae_zone_info {
 	u16 ae_zone_start_x;
 	u16 ae_zone_start_y;
@@ -372,7 +372,7 @@ struct isp_cmd_ae_zone_info {
  *@struct isp_cmd_af_zone_info
  *@brief ISP Command information for AF control
  */
-#pragma pack(1)
+#pragma pack()
 struct isp_cmd_af_zone_info {
 	u16 af_zone_start_x;
 	u16 af_zone_start_y;
@@ -382,7 +382,7 @@ struct isp_cmd_af_zone_info {
 };
 
 
-#pragma pack(1)
+#pragma pack()
 struct memmory_dump_hdr_info {
 	u32 start_addr;
 	u32 total_size;
@@ -395,7 +395,7 @@ struct memmory_dump_hdr_info {
  *@struct common_log_hdr_info
  *@brief Bulk data for memory dump header
  */
-#pragma pack(1)
+#pragma pack()
 struct common_log_hdr_info {
 	u32 total_size;
 	u32 block_size;
